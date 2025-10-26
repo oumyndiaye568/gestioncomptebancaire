@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Compte;
 use App\Models\Client;
+use App\Traits\ApiResponse;
 
 /**
  * @OA\Tag(
@@ -20,6 +21,7 @@ use App\Models\Client;
  */
 class ClientController extends Controller
 {
+    use ApiResponse;
     /**
      * Authentification du client et génération du token
      *
@@ -69,13 +71,13 @@ class ClientController extends Controller
             $client = Auth::guard('client')->user();
             $token = $client->createToken('client-token')->plainTextToken;
 
-            return response()->json([
+            return $this->success([
                 'client' => $client,
                 'token' => $token,
-            ]);
+            ], 'Connexion client réussie');
         }
 
-        return response()->json(['error' => 'Unauthorized'], 401);
+        return $this->unauthorized('Identifiants incorrects');
     }
 
     /**
@@ -122,7 +124,7 @@ class ClientController extends Controller
         // Vérifier que l'utilisateur connecté est un Client
         $user = $request->user();
         if (!$user instanceof Client) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return $this->forbidden('Accès réservé aux clients');
         }
 
         // Récupérer les comptes du client
@@ -148,10 +150,7 @@ class ClientController extends Controller
             ];
         });
 
-        // Retour JSON
-        return response()->json([
-            'success' => true,
-            'data' => $data,
-        ]);
+        // Retour avec le trait ApiResponse
+        return $this->success($data, 'Comptes récupérés avec succès');
     }
 }

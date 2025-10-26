@@ -14,11 +14,25 @@ return [
                  */
                 'api' => 'api/documentation',
             ],
+            'urls' => [
+                /*
+                 * Edit to set the swagger-ui base URL
+                 */
+                'base' => [
+                    'url' => env('L5_SWAGGER_BASE_URL', 'https://gestioncomptebancaire.onrender.com'),
+                    'name' => 'Production API',
+                ],
+            ],
             'paths' => [
                 /*
                  * Edit to include full URL in ui for assets
                  */
                 'use_absolute_path' => env('L5_SWAGGER_USE_ABSOLUTE_PATH', true),
+
+                /*
+                 * Edit to set the swagger-ui dist folder path (must be a full URL)
+                 */
+                'swagger_ui_dist_url' => env('L5_SWAGGER_UI_DIST_URL', 'https://gestioncomptebancaire.onrender.com/vendor/swagger-api/swagger-ui/dist/'),
 
                 /*
                 * Edit to set path where swagger ui assets should be stored

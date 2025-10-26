@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Compte;
 use App\Models\Admin;
+use App\Traits\ApiResponse;
 
 /**
  * @OA\Info(
@@ -30,6 +31,7 @@ use App\Models\Admin;
 
 class AdminController extends Controller
 {
+    use ApiResponse;
     /**
      * Authentification de l'admin et génération du token
      *
@@ -87,13 +89,13 @@ class AdminController extends Controller
         if ($admin && \Hash::check($request->password, $admin->password)) {
             $token = $admin->createToken('admin-token')->plainTextToken;
 
-            return response()->json([
+            return $this->success([
                 'admin' => $admin,
                 'token' => $token,
-            ]);
+            ], 'Connexion administrateur réussie');
         }
 
-        return response()->json(['error' => 'Unauthorized'], 401);
+        return $this->unauthorized('Identifiants incorrects');
     }
 
     /**
@@ -214,7 +216,7 @@ class AdminController extends Controller
         // Vérifier que l'utilisateur connecté est un Admin
         $user = $request->user();
         if (!$user instanceof Admin) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return $this->forbidden('Accès réservé aux administrateurs');
         }
 
         // Récupération des query parameters avec valeurs par défaut
@@ -291,24 +293,20 @@ class AdminController extends Controller
             ];
         });
 
-        // Retour JSON
-        return response()->json([
-            'success' => true,
-            'data' => $data,
-            'pagination' => [
-                'currentPage' => $comptes->currentPage(),
-                'totalPages' => $comptes->lastPage(),
-                'totalItems' => $comptes->total(),
-                'itemsPerPage' => $comptes->perPage(),
-                'hasNext' => $comptes->hasMorePages(),
-                'hasPrevious' => $comptes->currentPage() > 1
-            ],
+        // Retour avec le trait ApiResponse
+        return $this->successWithPagination($data, [
+            'currentPage' => $comptes->currentPage(),
+            'totalPages' => $comptes->lastPage(),
+            'totalItems' => $comptes->total(),
+            'itemsPerPage' => $comptes->perPage(),
+            'hasNext' => $comptes->hasMorePages(),
+            'hasPrevious' => $comptes->currentPage() > 1,
             'links' => [
                 'self' => $request->fullUrl(),
                 'next' => $comptes->nextPageUrl(),
                 'first' => $comptes->url(1),
                 'last' => $comptes->url($comptes->lastPage())
             ]
-        ]);
+        ], 'Liste des comptes récupérée avec succès');
     }
 }
