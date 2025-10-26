@@ -1,7 +1,8 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ClientController;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,6 +15,20 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//    return $request->user();
+// });
+
+// Routes pour l'admin
+Route::post('admin/login', [AdminController::class, 'login']);
+
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+    Route::get('comptes', [AdminController::class, 'getComptes']);
+});
+
+// Routes pour le client
+Route::post('client/login', [ClientController::class, 'login']);
+
+Route::middleware('auth:sanctum')->prefix('client')->group(function () {
+    Route::get('comptes', [ClientController::class, 'getComptes']);
 });

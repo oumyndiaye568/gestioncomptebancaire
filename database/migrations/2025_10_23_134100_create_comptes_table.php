@@ -14,9 +14,12 @@ return new class extends Migration
         Schema::create('comptes', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('titulaire');
-            $table->string('numerocompte');
-            $table->enum('statucompte',['actif','inactif','bloque']);
-            $table->enum('typedecompte',['cheque','epargne']);
+            $table->string('numero_compte');
+            $table->enum('type_compte',['cheque','epargne']);
+            $table->enum('etat_compte',['actif','inactif','bloque']);
+            $table->decimal('solde', 15, 2)->default(0); // solde du compte
+            $table->string('motif_blocage')->nullable();  // raison du blocage si existante
+            $table->uuid('client_id'); // clé étrangère vers clients
             $table->timestamps();
         });
     }
