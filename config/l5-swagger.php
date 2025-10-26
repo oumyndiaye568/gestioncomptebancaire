@@ -19,7 +19,7 @@ return [
                  * Edit to set the swagger-ui base URL
                  */
                 'base' => [
-                    'url' => env('L5_SWAGGER_BASE_URL', 'https://gestioncomptebancaire.onrender.com'),
+                    'url' => env('L5_SWAGGER_BASE_URL', env('APP_URL', 'https://gestioncomptebancaire.onrender.com')),
                     'name' => 'Production API',
                 ],
             ],
