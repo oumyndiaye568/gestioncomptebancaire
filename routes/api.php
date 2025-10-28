@@ -26,6 +26,7 @@ Route::prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);
     Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
     Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
+    Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
 });
 
 // Routes pour le client
