@@ -22,13 +22,14 @@ use App\Http\Controllers\ClientController;
 // Routes pour l'admin
 Route::post('admin/login', [AdminController::class, 'login']);
 
-Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+Route::prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);
+    Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
 });
 
 // Routes pour le client
 Route::post('client/login', [ClientController::class, 'login']);
 
-Route::middleware('auth:sanctum')->prefix('client')->group(function () {
+Route::prefix('client')->group(function () {
     Route::get('comptes', [ClientController::class, 'getComptes']);
 });

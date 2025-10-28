@@ -13,7 +13,7 @@ class CompteScope implements Scope
 {
     /**
      * Apply the scope to a given Eloquent query builder.
-     * Filtre automatiquement les comptes supprimés (soft delete)
+     * Filtre automatiquement les comptes supprimés (soft delete) et bloqués
      */
     public function apply(Builder $builder, Model $model): void
     {
@@ -21,5 +21,8 @@ class CompteScope implements Scope
         if (\Schema::hasColumn($model->getTable(), 'deleted_at')) {
             $builder->whereNull('deleted_at');
         }
+
+        // Filtre les comptes bloqués
+        $builder->where('etat_compte', '!=', 'bloque');
     }
 }

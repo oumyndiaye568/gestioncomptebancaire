@@ -3,6 +3,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use App\Enums\TypeCompte;
 use App\Enums\EtatCompte;
@@ -10,7 +11,7 @@ use App\Models\Scopes\CompteScope;
 
 class Compte extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * Les scopes globaux à appliquer automatiquement
