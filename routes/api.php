@@ -25,6 +25,7 @@ Route::post('admin/login', [AdminController::class, 'login']);
 Route::prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);
     Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
+    Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
 });
 
 // Routes pour le client
