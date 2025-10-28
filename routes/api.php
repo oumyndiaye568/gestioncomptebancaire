@@ -24,8 +24,11 @@ Route::post('admin/login', [AdminController::class, 'login']);
 
 Route::prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);
+    Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
     Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
     Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
+    Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
+    Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
     Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
 });
 

@@ -24,5 +24,10 @@ class CompteScope implements Scope
 
         // Filtre les comptes bloqués
         $builder->where('etat_compte', '!=', 'bloque');
+
+        // Filtre les comptes archivés (non archivés par défaut)
+        if (\Schema::hasColumn($model->getTable(), 'is_archived')) {
+            $builder->where('is_archived', false);
+        }
     }
 }

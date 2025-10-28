@@ -37,13 +37,14 @@ class Compte extends Model
 
 
      protected $fillable = [
-        
+
         'numero_compte',
         'type_compte',
         'etat_compte',
         'solde',
         'motif_blocage',
         'client_id',
+        'is_archived',
     ];
 
 
@@ -79,6 +80,18 @@ class Compte extends Model
        return $query->whereHas('client', function ($q) use ($telephone) {
            $q->where('telephone', $telephone);
        });
+   }
+
+   /**
+    * Scope local pour filtrer les comptes archivés ou non
+    *
+    * @param Builder $query
+    * @param bool $archived
+    * @return Builder
+    */
+   public function scopeArchived(Builder $query, bool $archived = false): Builder
+   {
+       return $query->where('is_archived', $archived);
    }
 
 
