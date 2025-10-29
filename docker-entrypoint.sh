@@ -27,7 +27,7 @@ echo "Updating client passwords"
 php artisan tinker --execute="App\Models\Client::all()->each(function(\$client) { \$client->update(['password' => \Illuminate\Support\Facades\Hash::make('password')]); });" || echo "Client password update failed, continuing..."
 
 echo "Generating Swagger documentation"
-php artisan l5-swagger:generate
+php artisan l5-swagger:generate || echo "Swagger generation failed, continuing..."
 
 echo "Starting Laravel application..."
 exec "$@"

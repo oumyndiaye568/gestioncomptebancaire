@@ -18,6 +18,11 @@ return new class extends Migration
             $table->string('password');
             $table->timestamps();
         });
+
+        // Ajouter les colonnes nécessaires pour Sanctum
+        Schema::table('admins', function (Blueprint $table) {
+            $table->rememberToken();
+        });
     }
 
     /**

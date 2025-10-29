@@ -53,6 +53,14 @@ class Admin extends Authenticatable
     ];
 
     /**
+     * Get the tokenable type for Sanctum
+     */
+    public function getMorphClass()
+    {
+        return 'App\\Models\\Admin';
+    }
+
+    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
