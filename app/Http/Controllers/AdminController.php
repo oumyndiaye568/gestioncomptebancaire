@@ -320,9 +320,22 @@ class AdminController extends Controller
                     'authorization_header' => $request->header('Authorization'),
                     'has_user' => $request->user() ? 'yes' : 'no',
                     'environment' => app()->environment(),
-                    'debug_mode' => config('app.debug')
+                    'debug_mode' => config('app.debug'),
+                    'sanctum_guard' => config('sanctum.guard'),
+                    'middleware' => $request->route() ? $request->route()->middleware() : 'none',
+                    'request_method' => $request->method(),
+                    'request_path' => $request->path(),
+                    'all_headers_count' => count($request->headers->all())
                 ]);
-                return $this->forbidden('Accès réservé aux administrateurs');
+
+                // En production, retourner une erreur générique pour éviter les fuites d'informations
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Server Error',
+                    'error' => 'Internal Server Error',
+                    'timestamp' => now()->toISOString(),
+                    'request_id' => $requestId
+                ], 500);
             }
 
             \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
@@ -516,15 +529,20 @@ class AdminController extends Controller
                 'line' => $e->getLine(),
                 'trace' => substr($e->getTraceAsString(), 0, 1000),
                 'memory_usage' => memory_get_peak_usage(true),
-                'environment' => app()->environment()
+                'environment' => app()->environment(),
+                'db_connection' => config('database.default'),
+                'db_host' => config('database.connections.pgsql.host'),
+                'request_headers' => $request->headers->all(),
+                'bearer_token_present' => $request->bearerToken() ? 'yes' : 'no'
             ]);
 
+            // Toujours retourner une erreur générique en production pour éviter les fuites d'informations
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
-                'request_id' => $requestId,
-                'timestamp' => now()->toISOString()
+                'message' => 'Server Error',
+                'error' => 'Internal Server Error',
+                'timestamp' => now()->toISOString(),
+                'request_id' => $requestId
             ], 500);
         }
     }
