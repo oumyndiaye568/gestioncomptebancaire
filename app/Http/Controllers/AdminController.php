@@ -303,7 +303,8 @@ class AdminController extends Controller
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'method' => $request->method(),
-                'url' => $request->fullUrl()
+                'url' => $request->fullUrl(),
+                'timestamp' => now()->toISOString()
             ]);
 
             // Vérification de l'authentification admin
