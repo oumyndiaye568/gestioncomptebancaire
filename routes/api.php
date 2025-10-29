@@ -22,7 +22,7 @@ use App\Http\Controllers\ClientController;
 // Routes pour l'admin
 Route::post('auth/login', [AdminController::class, 'login']);
 
-Route::prefix('admin')->group(function () {
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);
     Route::post('comptes', [AdminController::class, 'createCompte']);
     Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);

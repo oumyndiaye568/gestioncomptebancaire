@@ -294,110 +294,183 @@ class AdminController extends Controller
      */
     public function getComptes(Request $request)
     {
+        $requestId = uniqid('get_comptes_', true);
+
         try {
-            // Vérification temporairement désactivée pour les tests
-            // $user = $request->user();
-            // if (!$user instanceof Admin) {
-            //     return $this->forbidden('Accès réservé aux administrateurs');
-            // }
+            \Log::info("=== DÉBUT RÉCUPÉRATION COMPTES [{$requestId}] ===", [
+                'page' => $request->query('page', 1),
+                'limit' => $request->query('limit', 10),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'method' => $request->method(),
+                'url' => $request->fullUrl()
+            ]);
 
-        // Récupération des query parameters avec valeurs par défaut
-        $page = $request->query('page', 1);
-        $limit = $request->query('limit', 10);
-        $type = $request->query('type');           // type de compte : epargne / cheque
-        $statut = $request->query('statut');       // statut : actif / bloque / ferme
-        $search = $request->query('search');       // recherche par titulaire ou numéro
-        $sort = $request->query('sort', 'dateCreation'); // champ de tri
-        $order = $request->query('order', 'asc');        // ordre de tri
+            // Vérification de l'authentification admin
+            $user = $request->user();
+            if (!$user instanceof Admin) {
+                \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
+                    'user_type' => get_class($user),
+                    'user_id' => $user?->id
+                ]);
+                return $this->forbidden('Accès réservé aux administrateurs');
+            }
 
-        // Construction de la requête
-        $query = Compte::with('client'); // Inclure le client lié à chaque compte
+            \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
 
-        // Filtrage par type
-        if ($type) {
-            $query->where('type_compte', $type);
-        }
+            // Récupération des query parameters avec valeurs par défaut
+            $page = max(1, (int) $request->query('page', 1));
+            $limit = min(100, max(1, (int) $request->query('limit', 10))); // Limite max 100
+            $type = $request->query('type');
+            $statut = $request->query('statut');
+            $search = trim($request->query('search', ''));
+            $sort = $request->query('sort', 'dateCreation');
+            $order = in_array(strtolower($request->query('order', 'asc')), ['asc', 'desc']) ? strtolower($request->query('order', 'asc')) : 'asc';
 
-        // Filtrage par statut - si aucun statut spécifié, exclure les comptes bloqués (déjà fait via scope global)
-        // Mais permettre de voir les comptes bloqués si explicitement demandé
-        if ($statut) {
-            $query->where('etat_compte', $statut);
-        }
-        // Note: Le scope global CompteScope exclut déjà les comptes bloqués par défaut
+            \Log::info("Paramètres validés [{$requestId}]", [
+                'page' => $page,
+                'limit' => $limit,
+                'type' => $type,
+                'statut' => $statut,
+                'search' => $search,
+                'sort' => $sort,
+                'order' => $order
+            ]);
 
-        // Recherche par titulaire ou numéro de compte
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('numero_compte', 'like', "%$search%")
-                  ->orWhereHas('client', function($q2) use ($search) {
-                      $q2->where('nom_complet', 'like', "%$search%");
-                  });
+            // Construction de la requête optimisée
+            $query = Compte::with(['client:id,nom_complet,email']); // Charger seulement les champs nécessaires
+
+            // Filtrage par type
+            if ($type && in_array($type, ['cheque', 'epargne'])) {
+                $query->where('type_compte', $type);
+            }
+
+            // Filtrage par statut
+            if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
+                $query->where('etat_compte', $statut);
+            }
+
+            // Recherche optimisée
+            if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
+                $searchTerm = '%' . $search . '%';
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
+                      ->orWhereHas('client', function($q2) use ($searchTerm) {
+                          $q2->where('nom_complet', 'ILIKE', $searchTerm);
+                      });
+                });
+            }
+
+            // Tri optimisé
+            switch ($sort) {
+                case 'dateCreation':
+                    $query->orderBy('created_at', $order);
+                    break;
+                case 'solde':
+                    $query->orderBy('solde', $order);
+                    break;
+                case 'titulaire':
+                    $query->join('clients', 'comptes.client_id', '=', 'clients.id')
+                          ->orderBy('clients.nom_complet', $order)
+                          ->select('comptes.*');
+                    break;
+                default:
+                    $query->orderBy('created_at', $order);
+            }
+
+            \Log::info("Requête construite [{$requestId}]");
+
+            // Timeout pour éviter les blocages
+            set_time_limit(30); // 30 secondes maximum
+
+            // Pagination avec timeout
+            $startTime = microtime(true);
+            $comptes = $query->paginate($limit, ['*'], 'page', $page);
+            $queryTime = microtime(true) - $startTime;
+
+            \Log::info("Pagination exécutée [{$requestId}]", [
+                'query_time' => round($queryTime, 3) . 's',
+                'total_results' => $comptes->total(),
+                'current_page' => $comptes->currentPage(),
+                'per_page' => $comptes->perPage()
+            ]);
+
+            // Formatage optimisé des données
+            $data = $comptes->map(function($compte) {
+                return [
+                    'id' => $compte->id,
+                    'numeroCompte' => $compte->numero_compte,
+                    'titulaire' => $compte->client->nom_complet ?? null,
+                    'type' => $compte->type_compte,
+                    'solde' => (float) ($compte->solde ?? 0),
+                    'devise' => 'FCFA',
+                    'dateCreation' => $compte->created_at->toISOString(),
+                    'statut' => $compte->etat_compte,
+                    'motifBlocage' => $compte->motif_blocage,
+                    'metadata' => [
+                        'derniereModification' => $compte->updated_at->toISOString(),
+                        'version' => 1
+                    ]
+                ];
             });
-        }
 
-        // Tri
-        switch ($sort) {
-            case 'dateCreation':
-                $query->orderBy('created_at', $order);
-                break;
+            \Log::info("Données formatées [{$requestId}]", ['items_count' => count($data)]);
 
-            case 'solde':
-                $query->orderBy('solde', $order); // Assure-toi que le champ existe
-                break;
-
-            case 'titulaire':
-                $query->join('clients', 'comptes.client_id', '=', 'clients.id')
-                      ->orderBy('clients.nom_complet', $order)
-                      ->select('comptes.*'); // Evite les conflits
-                break;
-
-            default:
-                $query->orderBy('created_at', $order);
-        }
-
-        // Pagination
-        $comptes = $query->paginate($limit, ['*'], 'page', $page);
-
-        // Formatage des données de réponse
-        $data = $comptes->map(function($compte) {
-            return [
-                'id' => $compte->id,
-                'numeroCompte' => $compte->numero_compte,
-                'titulaire' => $compte->client->nom_complet ?? null,
-                'type' => $compte->type_compte,
-                'solde' => $compte->solde ?? 0,
-                'devise' => 'FCFA',
-                'dateCreation' => $compte->created_at->toIso8601String(),
-                'statut' => $compte->etat_compte,
-                'motifBlocage' => $compte->motif_blocage ?? null,
-                'metadata' => [
-                    'derniereModification' => $compte->updated_at->toIso8601String(),
-                    'version' => 1
+            // Réponse optimisée
+            $response = $this->successWithPagination($data, [
+                'currentPage' => $comptes->currentPage(),
+                'totalPages' => $comptes->lastPage(),
+                'totalItems' => $comptes->total(),
+                'itemsPerPage' => $comptes->perPage(),
+                'hasNext' => $comptes->hasMorePages(),
+                'hasPrevious' => $comptes->currentPage() > 1,
+                'links' => [
+                    'self' => $request->fullUrl(),
+                    'next' => $comptes->nextPageUrl(),
+                    'first' => $comptes->url(1),
+                    'last' => $comptes->url($comptes->lastPage())
                 ]
-            ];
-        });
+            ], 'Liste des comptes récupérée avec succès');
 
-        // Retour avec le trait ApiResponse
-        return $this->successWithPagination($data, [
-            'currentPage' => $comptes->currentPage(),
-            'totalPages' => $comptes->lastPage(),
-            'totalItems' => $comptes->total(),
-            'itemsPerPage' => $comptes->perPage(),
-            'hasNext' => $comptes->hasMorePages(),
-            'hasPrevious' => $comptes->currentPage() > 1,
-            'links' => [
-                'self' => $request->fullUrl(),
-                'next' => $comptes->nextPageUrl(),
-                'first' => $comptes->url(1),
-                'last' => $comptes->url($comptes->lastPage())
-            ]
-        ], 'Liste des comptes récupérée avec succès');
+            \Log::info("=== FIN RÉCUPÉRATION COMPTES [{$requestId}] ===", [
+                'status' => 'success',
+                'response_size' => strlen($response->getContent()),
+                'total_time' => round(microtime(true) - $startTime, 3) . 's'
+            ]);
+
+            return $response;
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error("Erreur DB lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
+                'sql' => $e->getSql(),
+                'bindings' => $e->getBindings(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de base de données',
+                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
+                'request_id' => $requestId,
+                'timestamp' => now()->toISOString()
+            ], 500);
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de la récupération des comptes: ' . $e->getMessage());
+            \Log::error("Erreur critique lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
+                'user_id' => $request->user()?->id,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => substr($e->getTraceAsString(), 0, 1000),
+                'memory_usage' => memory_get_peak_usage(true),
+                'environment' => app()->environment()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur serveur',
                 'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
+                'request_id' => $requestId,
                 'timestamp' => now()->toISOString()
             ], 500);
         }
