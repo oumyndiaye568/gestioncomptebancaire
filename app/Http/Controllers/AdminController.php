@@ -37,7 +37,7 @@ class AdminController extends Controller
      * Authentification de l'admin et génération du token
      *
      * @OA\Post(
-     *     path="/api/admin/login",
+     *     path="/api/auth/login",
      *     summary="Connexion administrateur",
      *     description="Authentifie un administrateur et retourne un token d'accès",
      *     operationId="adminLogin",
@@ -81,17 +81,38 @@ class AdminController extends Controller
      */
     public function login(Request $request)
     {
+        \Log::info('=== DÉBUT CONNEXION ADMIN ===', [
+            'request_id' => uniqid('login_', true),
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'headers' => $request->headers->all(),
+            'input' => $request->all()
+        ]);
+
         try {
-            \Log::info('Tentative de connexion admin', [
-                'email' => $request->input('email'),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
+            // Vérification de la base de données
+            \Log::info('Vérification connexion DB');
+            try {
+                \DB::connection()->getPdo();
+                \Log::info('Connexion DB OK');
+            } catch (\Exception $dbException) {
+                \Log::error('Erreur connexion DB: ' . $dbException->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur serveur',
+                    'error' => 'Erreur de base de données',
+                    'timestamp' => now()->toISOString()
+                ], 500);
+            }
 
             $request->validate([
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
+
+            \Log::info('Validation OK, recherche admin', ['email' => $request->email]);
 
             $admin = Admin::where('email', $request->email)->first();
 
@@ -100,19 +121,27 @@ class AdminController extends Controller
                 return $this->unauthorized('Identifiants incorrects');
             }
 
+            \Log::info('Admin trouvé, vérification mot de passe', ['admin_id' => $admin->id]);
+
             if (!\Hash::check($request->password, $admin->password)) {
                 \Log::warning('Mot de passe incorrect', ['email' => $request->email]);
                 return $this->unauthorized('Identifiants incorrects');
             }
 
+            \Log::info('Mot de passe OK, génération token');
+
             $token = $admin->createToken('admin-token')->plainTextToken;
 
-            \Log::info('Connexion admin réussie', ['email' => $request->email, 'admin_id' => $admin->id]);
+            \Log::info('Token généré avec succès', [
+                'admin_id' => $admin->id,
+                'token_prefix' => substr($token, 0, 10) . '...'
+            ]);
 
             return $this->success([
                 'admin' => $admin,
                 'token' => $token,
             ], 'Connexion administrateur réussie');
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::warning('Erreur de validation login', [
                 'errors' => $e->errors(),
@@ -129,12 +158,22 @@ class AdminController extends Controller
                 'email' => $request->input('email'),
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
-                'trace' => $e->getTraceAsString()
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'environment' => app()->environment(),
+                'debug_mode' => config('app.debug')
             ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur serveur',
                 'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
+                'debug_info' => app()->environment('local') ? [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => substr($e->getTraceAsString(), 0, 500)
+                ] : null,
                 'timestamp' => now()->toISOString()
             ], 500);
         }

@@ -32,6 +32,15 @@ php artisan cache:clear
 php artisan route:clear
 php artisan view:clear
 
+echo "Testing database connection"
+php artisan tinker --execute="try { DB::connection()->getPdo(); echo 'Database connection OK'; } catch(Exception \$e) { echo 'Database connection FAILED: ' . \$e->getMessage(); exit(1); }"
+
+echo "Running database migrations"
+php artisan migrate --force
+
+echo "Seeding database"
+php artisan db:seed --force
+
 echo "Generating Swagger documentation"
 php artisan l5-swagger:generate || echo "Swagger generation failed, continuing..."
 
