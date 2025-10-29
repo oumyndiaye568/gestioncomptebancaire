@@ -30,6 +30,17 @@ class Handler extends ExceptionHandler
         $this->renderable(function (Throwable $e, $request) {
             // Pour les requêtes API, retourner du JSON même en cas d'erreur
             if ($request->is('api/*') || $request->expectsJson()) {
+                // Log détaillé de l'erreur pour le debugging
+                \Log::error('API Error: ' . $e->getMessage(), [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                    'user_agent' => $request->userAgent(),
+                    'ip' => $request->ip()
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Server Error',

@@ -81,22 +81,36 @@ class AdminController extends Controller
      */
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
 
-        $admin = Admin::where('email', $request->email)->first();
-        if ($admin && \Hash::check($request->password, $admin->password)) {
-            $token = $admin->createToken('admin-token')->plainTextToken;
+            $admin = Admin::where('email', $request->email)->first();
+            if ($admin && \Hash::check($request->password, $admin->password)) {
+                $token = $admin->createToken('admin-token')->plainTextToken;
 
-            return $this->success([
-                'admin' => $admin,
-                'token' => $token,
-            ], 'Connexion administrateur réussie');
+                return $this->success([
+                    'admin' => $admin,
+                    'token' => $token,
+                ], 'Connexion administrateur réussie');
+            }
+
+            return $this->unauthorized('Identifiants incorrects');
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la connexion admin: ' . $e->getMessage(), [
+                'email' => $request->input('email'),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur',
+                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
+                'timestamp' => now()->toISOString()
+            ], 500);
         }
-
-        return $this->unauthorized('Identifiants incorrects');
     }
 
     /**
