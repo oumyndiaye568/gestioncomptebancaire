@@ -214,11 +214,12 @@ class AdminController extends Controller
      */
     public function getComptes(Request $request)
     {
-        // Vérification temporairement désactivée pour les tests
-        // $user = $request->user();
-        // if (!$user instanceof Admin) {
-        //     return $this->forbidden('Accès réservé aux administrateurs');
-        // }
+        try {
+            // Vérification temporairement désactivée pour les tests
+            // $user = $request->user();
+            // if (!$user instanceof Admin) {
+            //     return $this->forbidden('Accès réservé aux administrateurs');
+            // }
 
         // Récupération des query parameters avec valeurs par défaut
         $page = $request->query('page', 1);
@@ -311,6 +312,15 @@ class AdminController extends Controller
                 'last' => $comptes->url($comptes->lastPage())
             ]
         ], 'Liste des comptes récupérée avec succès');
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la récupération des comptes: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur',
+                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
+                'timestamp' => now()->toISOString()
+            ], 500);
+        }
     }
 
     /**

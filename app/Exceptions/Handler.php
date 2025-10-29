@@ -26,5 +26,17 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+
+        $this->renderable(function (Throwable $e, $request) {
+            // Pour les requêtes API, retourner du JSON même en cas d'erreur
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Server Error',
+                    'error' => app()->environment('local') ? $e->getMessage() : 'Internal Server Error',
+                    'timestamp' => now()->toISOString()
+                ], 500);
+            }
+        });
     }
 }

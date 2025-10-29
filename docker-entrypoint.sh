@@ -15,16 +15,16 @@ while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USERNAME 2>/dev/null; do
 done
 
 echo "Database is up - executing migrations"
-php artisan migrate --force
+php artisan migrate --force || echo "Migration failed, continuing..."
 
 echo "Running database seeders"
-php artisan db:seed --force
+php artisan db:seed --force || echo "Seeding failed, continuing..."
 
 echo "Creating admin user"
-php artisan tinker --execute="App\Models\Admin::firstOrCreate(['email' => 'admin@test.com'], ['nom' => 'Admin Test', 'password' => \Illuminate\Support\Facades\Hash::make('password')]);"
+php artisan tinker --execute="App\Models\Admin::firstOrCreate(['email' => 'admin@test.com'], ['nom' => 'Admin Test', 'password' => \Illuminate\Support\Facades\Hash::make('password')]);" || echo "Admin creation failed, continuing..."
 
 echo "Updating client passwords"
-php artisan tinker --execute="App\Models\Client::all()->each(function(\$client) { \$client->update(['password' => \Illuminate\Support\Facades\Hash::make('password')]); });"
+php artisan tinker --execute="App\Models\Client::all()->each(function(\$client) { \$client->update(['password' => \Illuminate\Support\Facades\Hash::make('password')]); });" || echo "Client password update failed, continuing..."
 
 echo "Generating Swagger documentation"
 php artisan l5-swagger:generate
