@@ -38,14 +38,25 @@ class Handler extends ExceptionHandler
                     'url' => $request->fullUrl(),
                     'method' => $request->method(),
                     'user_agent' => $request->userAgent(),
-                    'ip' => $request->ip()
+                    'ip' => $request->ip(),
+                    'request_data' => $request->all(),
+                    'headers' => $request->headers->all()
                 ]);
+
+                // En production, retourner plus de détails pour le debugging
+                $errorDetails = app()->environment('local') ? $e->getMessage() : 'Internal Server Error';
+
+                // Si c'est une erreur de base de données, donner plus d'infos
+                if ($e instanceof \Illuminate\Database\QueryException) {
+                    $errorDetails = app()->environment('local') ? 'Database Error: ' . $e->getMessage() : 'Database connection error';
+                }
 
                 return response()->json([
                     'success' => false,
                     'message' => 'Server Error',
-                    'error' => app()->environment('local') ? $e->getMessage() : 'Internal Server Error',
-                    'timestamp' => now()->toISOString()
+                    'error' => $errorDetails,
+                    'timestamp' => now()->toISOString(),
+                    'request_id' => uniqid('req_', true)
                 ], 500);
             }
         });

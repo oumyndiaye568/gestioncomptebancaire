@@ -26,8 +26,19 @@ php artisan tinker --execute="App\Models\Admin::firstOrCreate(['email' => 'admin
 echo "Updating client passwords"
 php artisan tinker --execute="App\Models\Client::all()->each(function(\$client) { \$client->update(['password' => \Illuminate\Support\Facades\Hash::make('password')]); });" || echo "Client password update failed, continuing..."
 
+echo "Clearing Laravel caches"
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+
 echo "Generating Swagger documentation"
 php artisan l5-swagger:generate || echo "Swagger generation failed, continuing..."
+
+echo "Caching configuration for production"
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
 
 echo "Starting Laravel application..."
 exec "$@"

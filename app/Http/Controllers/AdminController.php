@@ -82,27 +82,54 @@ class AdminController extends Controller
     public function login(Request $request)
     {
         try {
+            \Log::info('Tentative de connexion admin', [
+                'email' => $request->input('email'),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
             $request->validate([
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
 
             $admin = Admin::where('email', $request->email)->first();
-            if ($admin && \Hash::check($request->password, $admin->password)) {
-                $token = $admin->createToken('admin-token')->plainTextToken;
 
-                return $this->success([
-                    'admin' => $admin,
-                    'token' => $token,
-                ], 'Connexion administrateur réussie');
+            if (!$admin) {
+                \Log::warning('Admin non trouvé', ['email' => $request->email]);
+                return $this->unauthorized('Identifiants incorrects');
             }
 
-            return $this->unauthorized('Identifiants incorrects');
+            if (!\Hash::check($request->password, $admin->password)) {
+                \Log::warning('Mot de passe incorrect', ['email' => $request->email]);
+                return $this->unauthorized('Identifiants incorrects');
+            }
+
+            $token = $admin->createToken('admin-token')->plainTextToken;
+
+            \Log::info('Connexion admin réussie', ['email' => $request->email, 'admin_id' => $admin->id]);
+
+            return $this->success([
+                'admin' => $admin,
+                'token' => $token,
+            ], 'Connexion administrateur réussie');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Erreur de validation login', [
+                'errors' => $e->errors(),
+                'email' => $request->input('email')
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors(),
+                'timestamp' => now()->toISOString()
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('Erreur lors de la connexion admin: ' . $e->getMessage(), [
                 'email' => $request->input('email'),
                 'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
+                'user_agent' => $request->userAgent(),
+                'trace' => $e->getTraceAsString()
             ]);
             return response()->json([
                 'success' => false,
