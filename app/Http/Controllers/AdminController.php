@@ -329,7 +329,17 @@ class AdminController extends Controller
                     'sanctum_stateful_domains' => config('sanctum.stateful'),
                     'host_header' => $request->header('Host'),
                     'origin_header' => $request->header('Origin'),
-                    'referer_header' => $request->header('Referer')
+                    'referer_header' => $request->header('Referer'),
+                    'user_agent' => $request->userAgent(),
+                    'ip_address' => $request->ip(),
+                    'is_secure' => $request->isSecure(),
+                    'scheme' => $request->getScheme(),
+                    'full_url' => $request->fullUrl(),
+                    'route_name' => $request->route() ? $request->route()->getName() : 'none',
+                    'route_action' => $request->route() ? $request->route()->getActionName() : 'none',
+                    'request_content_type' => $request->header('Content-Type'),
+                    'accept_header' => $request->header('Accept'),
+                    'x_requested_with' => $request->header('X-Requested-With')
                 ]);
 
                 // En production, retourner une erreur générique pour éviter les fuites d'informations
