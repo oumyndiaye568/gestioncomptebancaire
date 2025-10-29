@@ -325,7 +325,11 @@ class AdminController extends Controller
                     'middleware' => $request->route() ? $request->route()->middleware() : 'none',
                     'request_method' => $request->method(),
                     'request_path' => $request->path(),
-                    'all_headers_count' => count($request->headers->all())
+                    'all_headers_count' => count($request->headers->all()),
+                    'sanctum_stateful_domains' => config('sanctum.stateful'),
+                    'host_header' => $request->header('Host'),
+                    'origin_header' => $request->header('Origin'),
+                    'referer_header' => $request->header('Referer')
                 ]);
 
                 // En production, retourner une erreur générique pour éviter les fuites d'informations
