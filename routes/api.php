@@ -35,6 +35,16 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
 });
 
+// Route de test
+Route::get('test', function() {
+    return response()->json([
+        'status' => 'OK',
+        'message' => 'API Laravel fonctionne correctement',
+        'timestamp' => now()->toISOString(),
+        'environment' => app()->environment()
+    ]);
+});
+
 // Routes pour le client
 Route::post('client/login', [ClientController::class, 'login']);
 
