@@ -389,6 +389,12 @@
                     {
                         "sanctum": []
                     }
+                ],
+                "servers": [
+                    {
+                        "url": "https://gestioncomptebancaire.onrender.com/",
+                        "description": "Serveur de production"
+                    }
                 ]
             },
             "post": {

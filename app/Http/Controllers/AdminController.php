@@ -183,12 +183,16 @@ class AdminController extends Controller
      * Récupérer la liste des comptes avec filtrage, pagination, tri et recherche.
      *
      * @OA\Get(
-     *     path="/api/admin/comptes",
-     *     summary="Lister les comptes bancaires",
-     *     description="Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche",
-     *     operationId="getComptes",
-     *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+          *     path="/api/admin/comptes",
+          *     summary="Lister les comptes bancaires",
+          *     description="Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche",
+          *     operationId="getComptes",
+          *     tags={"Comptes"},
+          *     security={{"sanctum":{}}},
+          *     @OA\Server(
+          *         url="https://gestioncomptebancaire.onrender.com/",
+          *         description="Serveur de production"
+          *     ),
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
