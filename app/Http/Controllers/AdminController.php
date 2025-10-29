@@ -310,7 +310,7 @@ class AdminController extends Controller
             $user = $request->user();
             if (!$user instanceof Admin) {
                 \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
-                    'user_type' => get_class($user),
+                    'user_type' => $user ? get_class($user) : 'null',
                     'user_id' => $user?->id
                 ]);
                 return $this->forbidden('Accès réservé aux administrateurs');
@@ -338,7 +338,7 @@ class AdminController extends Controller
             ]);
 
             // Construction de la requête optimisée
-            $query = Compte::with(['client:id,nom_complet,email']); // Charger seulement les champs nécessaires
+            $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
 
             // Filtrage par type
             if ($type && in_array($type, ['cheque', 'epargne'])) {
@@ -383,9 +383,25 @@ class AdminController extends Controller
             // Timeout pour éviter les blocages
             set_time_limit(30); // 30 secondes maximum
 
-            // Pagination avec timeout
+            // Pagination avec timeout et gestion mémoire
             $startTime = microtime(true);
-            $comptes = $query->paginate($limit, ['*'], 'page', $page);
+            try {
+                $comptes = $query->paginate($limit, ['*'], 'page', $page);
+            } catch (\Exception $paginationError) {
+                \Log::error("Erreur de pagination [{$requestId}]: " . $paginationError->getMessage(), [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'file' => $paginationError->getFile(),
+                    'line' => $paginationError->getLine()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la récupération des données',
+                    'error' => app()->environment('local') ? $paginationError->getMessage() : 'Erreur interne du serveur',
+                    'request_id' => $requestId,
+                    'timestamp' => now()->toISOString()
+                ], 500);
+            }
             $queryTime = microtime(true) - $startTime;
 
             \Log::info("Pagination exécutée [{$requestId}]", [
@@ -395,42 +411,70 @@ class AdminController extends Controller
                 'per_page' => $comptes->perPage()
             ]);
 
-            // Formatage optimisé des données
-            $data = $comptes->map(function($compte) {
-                return [
-                    'id' => $compte->id,
-                    'numeroCompte' => $compte->numero_compte,
-                    'titulaire' => $compte->client->nom_complet ?? null,
-                    'type' => $compte->type_compte,
-                    'solde' => (float) ($compte->solde ?? 0),
-                    'devise' => 'FCFA',
-                    'dateCreation' => $compte->created_at->toISOString(),
-                    'statut' => $compte->etat_compte,
-                    'motifBlocage' => $compte->motif_blocage,
-                    'metadata' => [
-                        'derniereModification' => $compte->updated_at->toISOString(),
-                        'version' => 1
-                    ]
-                ];
-            });
+            // Formatage optimisé des données avec gestion d'erreurs
+            try {
+                $data = $comptes->map(function($compte) {
+                    return [
+                        'id' => $compte->id,
+                        'numeroCompte' => $compte->numero_compte,
+                        'titulaire' => $compte->client->nom_complet ?? null,
+                        'type' => $compte->type_compte,
+                        'solde' => (float) ($compte->solde ?? 0),
+                        'devise' => 'FCFA',
+                        'dateCreation' => $compte->created_at->toISOString(),
+                        'statut' => $compte->etat_compte,
+                        'motifBlocage' => $compte->motif_blocage,
+                        'metadata' => [
+                            'derniereModification' => $compte->updated_at->toISOString(),
+                            'version' => 1
+                        ]
+                    ];
+                });
+            } catch (\Exception $formatError) {
+                \Log::error("Erreur de formatage des données [{$requestId}]: " . $formatError->getMessage(), [
+                    'file' => $formatError->getFile(),
+                    'line' => $formatError->getLine()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors du traitement des données',
+                    'error' => app()->environment('local') ? $formatError->getMessage() : 'Erreur interne du serveur',
+                    'request_id' => $requestId,
+                    'timestamp' => now()->toISOString()
+                ], 500);
+            }
 
             \Log::info("Données formatées [{$requestId}]", ['items_count' => count($data)]);
 
-            // Réponse optimisée
-            $response = $this->successWithPagination($data, [
-                'currentPage' => $comptes->currentPage(),
-                'totalPages' => $comptes->lastPage(),
-                'totalItems' => $comptes->total(),
-                'itemsPerPage' => $comptes->perPage(),
-                'hasNext' => $comptes->hasMorePages(),
-                'hasPrevious' => $comptes->currentPage() > 1,
-                'links' => [
-                    'self' => $request->fullUrl(),
-                    'next' => $comptes->nextPageUrl(),
-                    'first' => $comptes->url(1),
-                    'last' => $comptes->url($comptes->lastPage())
-                ]
-            ], 'Liste des comptes récupérée avec succès');
+            // Réponse optimisée avec gestion d'erreurs
+            try {
+                $response = $this->successWithPagination($data, [
+                    'currentPage' => $comptes->currentPage(),
+                    'totalPages' => $comptes->lastPage(),
+                    'totalItems' => $comptes->total(),
+                    'itemsPerPage' => $comptes->perPage(),
+                    'hasNext' => $comptes->hasMorePages(),
+                    'hasPrevious' => $comptes->currentPage() > 1,
+                    'links' => [
+                        'self' => $request->fullUrl(),
+                        'next' => $comptes->nextPageUrl(),
+                        'first' => $comptes->url(1),
+                        'last' => $comptes->url($comptes->lastPage())
+                    ]
+                ], 'Liste des comptes récupérée avec succès');
+            } catch (\Exception $responseError) {
+                \Log::error("Erreur de création de réponse [{$requestId}]: " . $responseError->getMessage(), [
+                    'file' => $responseError->getFile(),
+                    'line' => $responseError->getLine()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la génération de la réponse',
+                    'error' => app()->environment('local') ? $responseError->getMessage() : 'Erreur interne du serveur',
+                    'request_id' => $requestId,
+                    'timestamp' => now()->toISOString()
+                ], 500);
+            }
 
             \Log::info("=== FIN RÉCUPÉRATION COMPTES [{$requestId}] ===", [
                 'status' => 'success',
