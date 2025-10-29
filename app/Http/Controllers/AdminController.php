@@ -347,13 +347,7 @@ class AdminController extends Controller
                 ]);
 
                 // En production, retourner une erreur générique pour éviter les fuites d'informations
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Server Error',
-                    'error' => 'Internal Server Error',
-                    'timestamp' => now()->toISOString(),
-                    'request_id' => $requestId
-                ], 500);
+                return $this->unauthorized('Accès réservé aux administrateurs');
             }
 
             \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
