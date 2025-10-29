@@ -304,7 +304,9 @@ class AdminController extends Controller
                 'user_agent' => $request->userAgent(),
                 'method' => $request->method(),
                 'url' => $request->fullUrl(),
-                'timestamp' => now()->toISOString()
+                'timestamp' => now()->toISOString(),
+                'headers_count' => count($request->headers->all()),
+                'has_authorization' => $request->hasHeader('Authorization') ? 'yes' : 'no'
             ]);
 
             // Vérification de l'authentification admin
@@ -312,7 +314,13 @@ class AdminController extends Controller
             if (!$user instanceof Admin) {
                 \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
                     'user_type' => $user ? get_class($user) : 'null',
-                    'user_id' => $user?->id
+                    'user_id' => $user?->id,
+                    'headers' => $request->headers->all(),
+                    'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
+                    'authorization_header' => $request->header('Authorization'),
+                    'has_user' => $request->user() ? 'yes' : 'no',
+                    'environment' => app()->environment(),
+                    'debug_mode' => config('app.debug')
                 ]);
                 return $this->forbidden('Accès réservé aux administrateurs');
             }
