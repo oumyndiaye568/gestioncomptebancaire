@@ -1,10 +1,17 @@
 #!/bin/sh
 
-# Attendre que la base de données soit prête
+# Attendre que la base de données soit prête (avec timeout)
 echo "Waiting for database to be ready..."
-while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USERNAME; do
+timeout=60
+elapsed=0
+while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USERNAME 2>/dev/null; do
   echo "Database is unavailable - sleeping"
   sleep 1
+  elapsed=$((elapsed + 1))
+  if [ $elapsed -ge $timeout ]; then
+    echo "Database connection timeout reached. Continuing without database check..."
+    break
+  fi
 done
 
 echo "Database is up - executing migrations"

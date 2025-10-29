@@ -20,7 +20,7 @@ use App\Http\Controllers\ClientController;
 // });
 
 // Routes pour l'admin
-Route::post('admin/login', [AdminController::class, 'login']);
+Route::post('auth/login', [AdminController::class, 'login']);
 
 Route::prefix('admin')->group(function () {
     Route::get('comptes', [AdminController::class, 'getComptes']);

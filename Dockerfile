@@ -12,8 +12,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 # Étape 2: Image finale pour l'application
 FROM php:8.3-fpm-alpine
 
-# Installer les extensions PHP nécessaires
-RUN apk add --no-cache postgresql-dev \
+# Installer les extensions PHP nécessaires et les outils PostgreSQL
+RUN apk add --no-cache postgresql-dev postgresql-client \
     && docker-php-ext-install pdo pdo_pgsql
 
 # Créer un utilisateur non-root
