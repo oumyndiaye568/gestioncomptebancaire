@@ -30,6 +30,8 @@ Route::prefix('admin')->group(function () {
     Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
     Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
     Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
+    Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
+    Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
     Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
 });
 
