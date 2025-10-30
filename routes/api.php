@@ -25,8 +25,8 @@ use App\Http\Controllers\ClientController;
 //     ->name('passport.token');
 
 // Routes pour l'admin
-Route::prefix('oumy/v1/auth')->group(function () {
-    Route::post('', [AdminController::class, 'login']);
+Route::prefix('v1/auth')->group(function () {
+    Route::post('login', [AdminController::class, 'login']);
     Route::post('refresh', [AdminController::class, 'refresh']);
     Route::post('logout', [AdminController::class, 'logout'])->middleware('auth:api');
 });

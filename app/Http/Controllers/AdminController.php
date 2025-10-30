@@ -17,10 +17,7 @@ use App\Http\Requests\UpdateCompteRequest;
  *     description="API pour la gestion des comptes bancaires avec authentification OAuth2"
  * )
  *
- * @OA\Server(
- *     url="http://127.0.0.1:8000",
- *     description="Serveur de développement local"
- * )
+ 
  *
  * @OA\Server(
  *     url="https://gestioncomptebancaire.onrender.com/",
