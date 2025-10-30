@@ -281,12 +281,12 @@ class AdminController extends Controller
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentification requise',
-                'error' => 'Token d\'authentification manquant ou invalide',
-                'timestamp' => now()->toISOString()
-            ], 401);
+            return $this->error('Authentification requise', 401);
+        }
+
+        // Vérifier que l'utilisateur est un admin
+        if (!$user instanceof Admin) {
+            return $this->forbidden('Accès réservé aux administrateurs');
         }
 
         // Récupération des query parameters avec valeurs par défaut
@@ -359,7 +359,7 @@ class AdminController extends Controller
                     'version' => 1
                 ]
             ];
-        });
+        })->toArray();
 
         // Retour avec le trait ApiResponse
         return $this->successWithPagination($data, [

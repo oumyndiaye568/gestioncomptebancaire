@@ -42,6 +42,7 @@ trait ApiResponse
         $response = [
             'success' => false,
             'message' => $message,
+            'error' => $message,
             'timestamp' => now()->toISOString()
         ];
 
@@ -68,7 +69,7 @@ trait ApiResponse
             'data' => $data,
             'pagination' => $pagination,
             'timestamp' => now()->toISOString()
-        ]);
+        ], 200);
     }
 
     /**

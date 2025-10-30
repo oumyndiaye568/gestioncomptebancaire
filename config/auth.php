@@ -37,20 +37,25 @@ return [
 
     'guards' => [
        'web' => [
-           'driver' => 'session',
-           'provider' => 'users',
-       ],
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
 
-       'admin' => [
-           'driver' => 'passport',
-           'provider' => 'admins',
-       ],
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'admins',
+        ],
 
-       'client' => [
-           'driver' => 'passport',
-           'provider' => 'clients',
-       ],
-   ],
+        'admin' => [
+            'driver' => 'passport',
+            'provider' => 'admins',
+        ],
+
+        'client' => [
+            'driver' => 'passport',
+            'provider' => 'clients',
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
