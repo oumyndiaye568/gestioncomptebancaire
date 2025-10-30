@@ -25,13 +25,13 @@ use App\Http\Controllers\ClientController;
 //     ->name('passport.token');
 
 // Routes pour l'admin
-Route::prefix('v1/auth')->group(function () {
-    Route::post('login', [AdminController::class, 'login']);
+Route::prefix('oumy/v1/auth')->group(function () {
+    Route::post('', [AdminController::class, 'login']);
     Route::post('refresh', [AdminController::class, 'refresh']);
     Route::post('logout', [AdminController::class, 'logout'])->middleware('auth:api');
 });
 
-Route::middleware(['auth:api', 'role:admin', 'logging'])->prefix('v1/admin')->group(function () {
+Route::middleware(['auth:api', 'role:admin', 'logging'])->prefix('oumy/v1/admin')->group(function () {
     // Test route pour vérifier l'authentification
     Route::get('test-auth', function() {
         return response()->json([
