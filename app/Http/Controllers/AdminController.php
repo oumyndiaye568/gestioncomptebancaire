@@ -395,7 +395,7 @@ class AdminController extends Controller
                 });
             }
 
-            // Tri optimisé
+            // Tri optimisé - éviter les JOIN coûteux
             switch ($sort) {
                 case 'dateCreation':
                     $query->orderBy('created_at', $order);
@@ -404,7 +404,8 @@ class AdminController extends Controller
                     $query->orderBy('solde', $order);
                     break;
                 case 'titulaire':
-                    $query->join('clients', 'comptes.client_id', '=', 'clients.id')
+                    // Utiliser une sous-requête pour éviter le JOIN coûteux
+                    $query->leftJoin('clients', 'comptes.client_id', '=', 'clients.id')
                           ->orderBy('clients.nom_complet', $order)
                           ->select('comptes.*');
                     break;
@@ -414,12 +415,14 @@ class AdminController extends Controller
 
             \Log::info("Requête construite [{$requestId}]");
 
-            // Timeout pour éviter les blocages
-            set_time_limit(30); // 30 secondes maximum
+            // Timeout pour éviter les blocages - optimisé à 10 secondes
+            set_time_limit(10); // 10 secondes maximum
 
-            // Pagination avec timeout et gestion mémoire
+            // Pagination avec timeout optimisé et gestion mémoire
             $startTime = microtime(true);
             try {
+                // Timeout spécifique pour la requête DB (5 secondes)
+                $query->timeout(5000); // 5 secondes pour PostgreSQL
                 $comptes = $query->paginate($limit, ['*'], 'page', $page);
             } catch (\Exception $paginationError) {
                 \Log::error("Erreur de pagination [{$requestId}]: " . $paginationError->getMessage(), [
@@ -451,7 +454,7 @@ class AdminController extends Controller
                     return [
                         'id' => $compte->id,
                         'numeroCompte' => $compte->numero_compte,
-                        'titulaire' => $compte->client->nom_complet ?? null,
+                        'titulaire' => $compte->client->nom_complet ?? 'Titulaire inconnu',
                         'type' => $compte->type_compte,
                         'solde' => (float) ($compte->solde ?? 0),
                         'devise' => 'FCFA',
