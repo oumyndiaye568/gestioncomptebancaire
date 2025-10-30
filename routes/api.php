@@ -19,10 +19,10 @@ use App\Http\Controllers\ClientController;
 //    return $request->user();
 // });
 
-// Routes OAuth2 Passport
-Route::post('oauth/token', '\Laravel\Passport\Http\Controllers\AccessTokenController@issueToken')
-    ->middleware(['throttle'])
-    ->name('passport.token');
+// Routes OAuth2 Passport - Supprimé car Passport gère automatiquement cette route
+// Route::post('oauth/token', '\Laravel\Passport\Http\Controllers\AccessTokenController@issueToken')
+//     ->middleware(['throttle'])
+//     ->name('passport.token');
 
 // Routes pour l'admin
 Route::prefix('v1/auth')->group(function () {
