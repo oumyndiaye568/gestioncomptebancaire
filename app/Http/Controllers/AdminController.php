@@ -299,19 +299,34 @@ class AdminController extends Controller
     public function getComptes(Request $request)
     {
         try {
-            // Version simplifiée pour éviter les erreurs en production
+            // Authentification simplifiée pour éviter les erreurs Sanctum
             $user = $request->user();
-            if (!$user instanceof Admin) {
-                return $this->unauthorized('Accès réservé aux administrateurs');
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentification requise',
+                    'error' => 'Token manquant ou invalide',
+                    'timestamp' => now()->toISOString()
+                ], 401);
             }
 
-            // Requête simplifiée sans JOIN coûteux
+            // Vérifier que c'est un admin (sans instanceof pour éviter les erreurs)
+            if (get_class($user) !== 'App\Models\Admin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Accès réservé aux administrateurs',
+                    'error' => 'Permissions insuffisantes',
+                    'timestamp' => now()->toISOString()
+                ], 403);
+            }
+
+            // Requête optimisée avec gestion d'erreurs
             $comptes = Compte::withoutGlobalScopes()
                             ->with(['client:id,nom_complet,email,telephone'])
                             ->orderBy('created_at', 'desc')
                             ->paginate(10);
 
-            // Formatage simplifié
+            // Formatage sécurisé
             $data = $comptes->map(function($compte) {
                 return [
                     'id' => $compte->id,
@@ -330,23 +345,34 @@ class AdminController extends Controller
                 ];
             });
 
-            return $this->successWithPagination($data, [
-                'currentPage' => $comptes->currentPage(),
-                'totalPages' => $comptes->lastPage(),
-                'totalItems' => $comptes->total(),
-                'itemsPerPage' => $comptes->perPage(),
-                'hasNext' => $comptes->hasMorePages(),
-                'hasPrevious' => $comptes->currentPage() > 1,
-                'links' => [
-                    'self' => $request->fullUrl(),
-                    'next' => $comptes->nextPageUrl(),
-                    'first' => $request->url() . '?page=1',
-                    'last' => $request->url() . '?page=' . $comptes->lastPage()
-                ]
-            ], 'Liste des comptes récupérée avec succès');
+            return response()->json([
+                'success' => true,
+                'message' => 'Liste des comptes récupérée avec succès',
+                'data' => $data,
+                'pagination' => [
+                    'currentPage' => $comptes->currentPage(),
+                    'totalPages' => $comptes->lastPage(),
+                    'totalItems' => $comptes->total(),
+                    'itemsPerPage' => $comptes->perPage(),
+                    'hasNext' => $comptes->hasMorePages(),
+                    'hasPrevious' => $comptes->currentPage() > 1,
+                    'links' => [
+                        'self' => $request->fullUrl(),
+                        'next' => $comptes->nextPageUrl(),
+                        'first' => $request->url() . '?page=1',
+                        'last' => $request->url() . '?page=' . $comptes->lastPage()
+                    ]
+                ],
+                'timestamp' => now()->toISOString()
+            ]);
 
         } catch (\Exception $e) {
-            \Log::error('Erreur simplifiée getComptes: ' . $e->getMessage());
+            \Log::error('Erreur getComptes production: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => substr($e->getTraceAsString(), 0, 500)
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des données',
