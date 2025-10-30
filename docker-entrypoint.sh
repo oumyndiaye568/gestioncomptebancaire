@@ -17,11 +17,11 @@ done
 echo "Database is up - executing migrations"
 php artisan migrate --force || echo "Migration failed, continuing..."
 
-echo "Running database seeders"
-php artisan db:seed --force || echo "Seeding failed, continuing..."
-
 echo "Creating admin user"
 php artisan tinker --execute="App\Models\Admin::firstOrCreate(['email' => 'admin@test.com'], ['nom' => 'Admin Test', 'password' => \Illuminate\Support\Facades\Hash::make('password')]);" || echo "Admin creation failed, continuing..."
+
+echo "Running database seeders"
+php artisan db:seed --force || echo "Seeding failed, continuing..."
 
 echo "Updating client passwords"
 php artisan tinker --execute="App\Models\Client::all()->each(function(\$client) { \$client->update(['password' => \Illuminate\Support\Facades\Hash::make('password')]); });" || echo "Client password update failed, continuing..."
@@ -34,12 +34,6 @@ php artisan view:clear
 
 echo "Testing database connection"
 php artisan tinker --execute="try { DB::connection()->getPdo(); echo 'Database connection OK'; } catch(Exception \$e) { echo 'Database connection FAILED: ' . \$e->getMessage(); exit(1); }"
-
-echo "Running database migrations"
-php artisan migrate --force
-
-echo "Seeding database"
-php artisan db:seed --force
 
 echo "Generating Swagger documentation"
 php artisan l5-swagger:generate || echo "Swagger generation failed, continuing..."
