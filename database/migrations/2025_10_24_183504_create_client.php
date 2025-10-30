@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clients', function (Blueprint $table) {
-             $table->uuid('id')->primary();
-            $table->string('nom_complet');
-            $table->string('email')->unique();
-            $table->string('telephone');
-            $table->string('adresse');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('clients')) {
+            Schema::create('clients', function (Blueprint $table) {
+                 $table->uuid('id')->primary();
+                $table->string('nom_complet');
+                $table->string('email')->unique();
+                $table->string('telephone');
+                $table->string('adresse');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

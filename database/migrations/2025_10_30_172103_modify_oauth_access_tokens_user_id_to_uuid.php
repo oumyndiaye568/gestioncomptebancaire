@@ -12,8 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Utiliser du SQL brut pour PostgreSQL car Laravel ne gère pas bien la conversion
-        DB::statement('ALTER TABLE oauth_access_tokens ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid');
+        if (Schema::hasTable('oauth_access_tokens')) {
+            // Vérifier le type actuel de la colonne
+            $column = DB::select("SELECT data_type FROM information_schema.columns WHERE table_name = 'oauth_access_tokens' AND column_name = 'user_id'");
+            if (!empty($column) && $column[0]->data_type !== 'uuid') {
+                // Utiliser du SQL brut pour PostgreSQL car Laravel ne gère pas bien la conversion
+                DB::statement('ALTER TABLE oauth_access_tokens ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid');
+            }
+        }
     }
 
     /**

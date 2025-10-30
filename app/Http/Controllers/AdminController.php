@@ -289,6 +289,11 @@ class AdminController extends Controller
             return $this->forbidden('Accès réservé aux administrateurs');
         }
 
+        // Vérifier le rôle de l'utilisateur
+        if ($user->role !== 'admin') {
+            return $this->forbidden('Accès réservé aux administrateurs');
+        }
+
         // Récupération des query parameters avec valeurs par défaut
         $page = max(1, (int) $request->query('page', 1));
         $limit = min(100, max(1, (int) $request->query('limit', 10))); // Limite max 100

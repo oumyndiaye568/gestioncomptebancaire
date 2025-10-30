@@ -11,15 +11,29 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('comptes', function (Blueprint $table) {
-            // Index pour optimiser les requêtes de tri et filtrage
-            $table->index(['type_compte', 'etat_compte'], 'idx_comptes_type_etat');
-            $table->index('solde', 'idx_comptes_solde');
-            $table->index('created_at', 'idx_comptes_created_at');
-            $table->index('client_id', 'idx_comptes_client_id');
-            $table->index('numero_compte', 'idx_comptes_numero');
-            $table->index('is_archived', 'idx_comptes_archived');
-        });
+        if (Schema::hasTable('comptes')) {
+            Schema::table('comptes', function (Blueprint $table) {
+                // Index pour optimiser les requêtes de tri et filtrage
+                if (!$table->hasIndex('idx_comptes_type_etat')) {
+                    $table->index(['type_compte', 'etat_compte'], 'idx_comptes_type_etat');
+                }
+                if (!$table->hasIndex('idx_comptes_solde')) {
+                    $table->index('solde', 'idx_comptes_solde');
+                }
+                if (!$table->hasIndex('idx_comptes_created_at')) {
+                    $table->index('created_at', 'idx_comptes_created_at');
+                }
+                if (!$table->hasIndex('idx_comptes_client_id')) {
+                    $table->index('client_id', 'idx_comptes_client_id');
+                }
+                if (!$table->hasIndex('idx_comptes_numero')) {
+                    $table->index('numero_compte', 'idx_comptes_numero');
+                }
+                if (!$table->hasIndex('idx_comptes_archived')) {
+                    $table->index('is_archived', 'idx_comptes_archived');
+                }
+            });
+        }
     }
 
     /**

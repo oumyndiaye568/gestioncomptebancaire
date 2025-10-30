@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('comptes', function (Blueprint $table) {
-            $table->boolean('is_archived')->default(false)->after('motif_blocage');
-        });
+        if (Schema::hasTable('comptes') && !Schema::hasColumn('comptes', 'is_archived')) {
+            Schema::table('comptes', function (Blueprint $table) {
+                $table->boolean('is_archived')->default(false)->after('motif_blocage');
+            });
+        }
     }
 
     /**
