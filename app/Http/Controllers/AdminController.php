@@ -298,266 +298,61 @@ class AdminController extends Controller
      */
     public function getComptes(Request $request)
     {
-        $requestId = uniqid('get_comptes_', true);
-
         try {
-            \Log::info("=== DÉBUT RÉCUPÉRATION COMPTES [{$requestId}] ===", [
-                'page' => $request->query('page', 1),
-                'limit' => $request->query('limit', 10),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'method' => $request->method(),
-                'url' => $request->fullUrl(),
-                'timestamp' => now()->toISOString(),
-                'headers_count' => count($request->headers->all()),
-                'has_authorization' => $request->hasHeader('Authorization') ? 'yes' : 'no'
-            ]);
-
-            // Vérification de l'authentification admin
+            // Version simplifiée pour éviter les erreurs en production
             $user = $request->user();
             if (!$user instanceof Admin) {
-                \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
-                    'user_type' => $user ? get_class($user) : 'null',
-                    'user_id' => $user?->id,
-                    'headers' => $request->headers->all(),
-                    'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
-                    'authorization_header' => $request->header('Authorization'),
-                    'has_user' => $request->user() ? 'yes' : 'no',
-                    'environment' => app()->environment(),
-                    'debug_mode' => config('app.debug'),
-                    'sanctum_guard' => config('sanctum.guard'),
-                    'middleware' => $request->route() ? $request->route()->middleware() : 'none',
-                    'request_method' => $request->method(),
-                    'request_path' => $request->path(),
-                    'all_headers_count' => count($request->headers->all()),
-                    'sanctum_stateful_domains' => config('sanctum.stateful'),
-                    'host_header' => $request->header('Host'),
-                    'origin_header' => $request->header('Origin'),
-                    'referer_header' => $request->header('Referer'),
-                    'user_agent' => $request->userAgent(),
-                    'ip_address' => $request->ip(),
-                    'is_secure' => $request->isSecure(),
-                    'scheme' => $request->getScheme(),
-                    'full_url' => $request->fullUrl(),
-                    'route_name' => $request->route() ? $request->route()->getName() : 'none',
-                    'route_action' => $request->route() ? $request->route()->getActionName() : 'none',
-                    'request_content_type' => $request->header('Content-Type'),
-                    'accept_header' => $request->header('Accept'),
-                    'x_requested_with' => $request->header('X-Requested-With')
-                ]);
-
-                // En production, retourner une erreur générique pour éviter les fuites d'informations
                 return $this->unauthorized('Accès réservé aux administrateurs');
             }
 
-            \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
+            // Requête simplifiée sans JOIN coûteux
+            $comptes = Compte::withoutGlobalScopes()
+                            ->with(['client:id,nom_complet,email,telephone'])
+                            ->orderBy('created_at', 'desc')
+                            ->paginate(10);
 
-            // Récupération des query parameters avec valeurs par défaut
-            $page = max(1, (int) $request->query('page', 1));
-            $limit = min(100, max(1, (int) $request->query('limit', 10))); // Limite max 100
-            $type = $request->query('type');
-            $statut = $request->query('statut');
-            $search = trim($request->query('search', ''));
-            $sort = $request->query('sort', 'dateCreation');
-            $order = in_array(strtolower($request->query('order', 'asc')), ['asc', 'desc']) ? strtolower($request->query('order', 'asc')) : 'asc';
-
-            \Log::info("Paramètres validés [{$requestId}]", [
-                'page' => $page,
-                'limit' => $limit,
-                'type' => $type,
-                'statut' => $statut,
-                'search' => $search,
-                'sort' => $sort,
-                'order' => $order
-            ]);
-
-            // Construction de la requête optimisée
-            $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
-
-            // Filtrage par type
-            if ($type && in_array($type, ['cheque', 'epargne'])) {
-                $query->where('type_compte', $type);
-            }
-
-            // Filtrage par statut
-            if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
-                $query->where('etat_compte', $statut);
-            }
-
-            // Recherche optimisée
-            if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
-                $searchTerm = '%' . $search . '%';
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
-                      ->orWhereHas('client', function($q2) use ($searchTerm) {
-                          $q2->where('nom_complet', 'ILIKE', $searchTerm);
-                      });
-                });
-            }
-
-            // Tri optimisé - éviter les JOIN coûteux
-            switch ($sort) {
-                case 'dateCreation':
-                    $query->orderBy('created_at', $order);
-                    break;
-                case 'solde':
-                    $query->orderBy('solde', $order);
-                    break;
-                case 'titulaire':
-                    // Utiliser une sous-requête pour éviter le JOIN coûteux
-                    $query->leftJoin('clients', 'comptes.client_id', '=', 'clients.id')
-                          ->orderBy('clients.nom_complet', $order)
-                          ->select('comptes.*');
-                    break;
-                default:
-                    $query->orderBy('created_at', $order);
-            }
-
-            \Log::info("Requête construite [{$requestId}]");
-
-            // Timeout pour éviter les blocages - optimisé à 10 secondes
-            set_time_limit(10); // 10 secondes maximum
-
-            // Pagination avec timeout optimisé et gestion mémoire
-            $startTime = microtime(true);
-            try {
-                // Timeout spécifique pour la requête DB (5 secondes)
-                $query->timeout(5000); // 5 secondes pour PostgreSQL
-                $comptes = $query->paginate($limit, ['*'], 'page', $page);
-            } catch (\Exception $paginationError) {
-                \Log::error("Erreur de pagination [{$requestId}]: " . $paginationError->getMessage(), [
-                    'page' => $page,
-                    'limit' => $limit,
-                    'file' => $paginationError->getFile(),
-                    'line' => $paginationError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la récupération des données',
-                    'error' => app()->environment('local') ? $paginationError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
-            $queryTime = microtime(true) - $startTime;
-
-            \Log::info("Pagination exécutée [{$requestId}]", [
-                'query_time' => round($queryTime, 3) . 's',
-                'total_results' => $comptes->total(),
-                'current_page' => $comptes->currentPage(),
-                'per_page' => $comptes->perPage()
-            ]);
-
-            // Formatage optimisé des données avec gestion d'erreurs
-            try {
-                $data = $comptes->map(function($compte) {
-                    return [
-                        'id' => $compte->id,
-                        'numeroCompte' => $compte->numero_compte,
-                        'titulaire' => $compte->client->nom_complet ?? 'Titulaire inconnu',
-                        'type' => $compte->type_compte,
-                        'solde' => (float) ($compte->solde ?? 0),
-                        'devise' => 'FCFA',
-                        'dateCreation' => $compte->created_at->toISOString(),
-                        'statut' => $compte->etat_compte,
-                        'motifBlocage' => $compte->motif_blocage,
-                        'metadata' => [
-                            'derniereModification' => $compte->updated_at->toISOString(),
-                            'version' => 1
-                        ]
-                    ];
-                });
-            } catch (\Exception $formatError) {
-                \Log::error("Erreur de formatage des données [{$requestId}]: " . $formatError->getMessage(), [
-                    'file' => $formatError->getFile(),
-                    'line' => $formatError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors du traitement des données',
-                    'error' => app()->environment('local') ? $formatError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
-
-            \Log::info("Données formatées [{$requestId}]", ['items_count' => count($data)]);
-
-            // Réponse optimisée avec gestion d'erreurs
-            try {
-                $response = $this->successWithPagination($data, [
-                    'currentPage' => $comptes->currentPage(),
-                    'totalPages' => $comptes->lastPage(),
-                    'totalItems' => $comptes->total(),
-                    'itemsPerPage' => $comptes->perPage(),
-                    'hasNext' => $comptes->hasMorePages(),
-                    'hasPrevious' => $comptes->currentPage() > 1,
-                    'links' => [
-                        'self' => $request->fullUrl(),
-                        'next' => $comptes->nextPageUrl(),
-                        'first' => $comptes->url(1),
-                        'last' => $comptes->url($comptes->lastPage())
+            // Formatage simplifié
+            $data = $comptes->map(function($compte) {
+                return [
+                    'id' => $compte->id,
+                    'numeroCompte' => $compte->numero_compte ?? 'N/A',
+                    'titulaire' => $compte->client->nom_complet ?? 'Titulaire inconnu',
+                    'type' => $compte->type_compte ?? 'inconnu',
+                    'solde' => (float) ($compte->solde ?? 0),
+                    'devise' => 'FCFA',
+                    'dateCreation' => $compte->created_at ? $compte->created_at->toISOString() : now()->toISOString(),
+                    'statut' => $compte->etat_compte ?? 'inconnu',
+                    'motifBlocage' => $compte->motif_blocage,
+                    'metadata' => [
+                        'derniereModification' => $compte->updated_at ? $compte->updated_at->toISOString() : now()->toISOString(),
+                        'version' => 1
                     ]
-                ], 'Liste des comptes récupérée avec succès');
-            } catch (\Exception $responseError) {
-                \Log::error("Erreur de création de réponse [{$requestId}]: " . $responseError->getMessage(), [
-                    'file' => $responseError->getFile(),
-                    'line' => $responseError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la génération de la réponse',
-                    'error' => app()->environment('local') ? $responseError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
+                ];
+            });
 
-            \Log::info("=== FIN RÉCUPÉRATION COMPTES [{$requestId}] ===", [
-                'status' => 'success',
-                'response_size' => strlen($response->getContent()),
-                'total_time' => round(microtime(true) - $startTime, 3) . 's'
-            ]);
+            return $this->successWithPagination($data, [
+                'currentPage' => $comptes->currentPage(),
+                'totalPages' => $comptes->lastPage(),
+                'totalItems' => $comptes->total(),
+                'itemsPerPage' => $comptes->perPage(),
+                'hasNext' => $comptes->hasMorePages(),
+                'hasPrevious' => $comptes->currentPage() > 1,
+                'links' => [
+                    'self' => $request->fullUrl(),
+                    'next' => $comptes->nextPageUrl(),
+                    'first' => $request->url() . '?page=1',
+                    'last' => $request->url() . '?page=' . $comptes->lastPage()
+                ]
+            ], 'Liste des comptes récupérée avec succès');
 
-            return $response;
-
-        } catch (\Illuminate\Database\QueryException $e) {
-            \Log::error("Erreur DB lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
-                'sql' => $e->getSql(),
-                'bindings' => $e->getBindings(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur de base de données',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
-                'request_id' => $requestId,
-                'timestamp' => now()->toISOString()
-            ], 500);
         } catch (\Exception $e) {
-            \Log::error("Erreur critique lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
-                'user_id' => $request->user()?->id,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => substr($e->getTraceAsString(), 0, 1000),
-                'memory_usage' => memory_get_peak_usage(true),
-                'environment' => app()->environment(),
-                'db_connection' => config('database.default'),
-                'db_host' => config('database.connections.pgsql.host'),
-                'request_headers' => $request->headers->all(),
-                'bearer_token_present' => $request->bearerToken() ? 'yes' : 'no'
-            ]);
-
-            // Toujours retourner une erreur générique en production pour éviter les fuites d'informations
+            \Log::error('Erreur simplifiée getComptes: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Server Error',
-                'error' => 'Internal Server Error',
+                'message' => 'Erreur lors de la récupération des données',
+                'error' => 'Erreur interne du serveur',
                 'timestamp' => now()->toISOString(),
-                'request_id' => $requestId
+                'request_id' => uniqid('error_', true)
             ], 500);
         }
     }
