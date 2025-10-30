@@ -318,10 +318,8 @@ class AdminController extends Controller
 
             // Vérification de l'authentification admin
             $user = $request->user();
-            if (!$user instanceof Admin) {
-                \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
-                    'user_type' => $user ? get_class($user) : 'null',
-                    'user_id' => $user?->id,
+            if (!$user) {
+                \Log::warning("Accès refusé - Aucun utilisateur authentifié [{$requestId}]", [
                     'headers' => $request->headers->all(),
                     'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
                     'authorization_header' => $request->header('Authorization'),
@@ -349,8 +347,55 @@ class AdminController extends Controller
                     'x_requested_with' => $request->header('X-Requested-With')
                 ]);
 
-                // En production, retourner une erreur générique pour éviter les fuites d'informations
-                return $this->unauthorized('Accès réservé aux administrateurs');
+                // Retourner une erreur 401 Unauthorized
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentification requise',
+                    'error' => 'Token d\'authentification manquant ou invalide',
+                    'timestamp' => now()->toISOString(),
+                    'request_id' => $requestId
+                ], 401);
+            }
+
+            if (!$user instanceof Admin) {
+                \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
+                    'user_type' => get_class($user),
+                    'user_id' => $user->id,
+                    'headers' => $request->headers->all(),
+                    'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
+                    'authorization_header' => $request->header('Authorization'),
+                    'has_user' => $request->user() ? 'yes' : 'no',
+                    'environment' => app()->environment(),
+                    'debug_mode' => config('app.debug'),
+                    'sanctum_guard' => config('sanctum.guard'),
+                    'middleware' => $request->route() ? $request->route()->middleware() : 'none',
+                    'request_method' => $request->method(),
+                    'request_path' => $request->path(),
+                    'all_headers_count' => count($request->headers->all()),
+                    'sanctum_stateful_domains' => config('sanctum.stateful'),
+                    'host_header' => $request->header('Host'),
+                    'origin_header' => $request->header('Origin'),
+                    'referer_header' => $request->header('Referer'),
+                    'user_agent' => $request->userAgent(),
+                    'ip_address' => $request->ip(),
+                    'is_secure' => $request->isSecure(),
+                    'scheme' => $request->getScheme(),
+                    'full_url' => $request->fullUrl(),
+                    'route_name' => $request->route() ? $request->route()->getName() : 'none',
+                    'route_action' => $request->route() ? $request->route()->getActionName() : 'none',
+                    'request_content_type' => $request->header('Content-Type'),
+                    'accept_header' => $request->header('Accept'),
+                    'x_requested_with' => $request->header('X-Requested-With')
+                ]);
+
+                // Retourner une erreur 403 Forbidden
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Accès refusé',
+                    'error' => 'Accès réservé aux administrateurs',
+                    'timestamp' => now()->toISOString(),
+                    'request_id' => $requestId
+                ], 403);
             }
 
             \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
