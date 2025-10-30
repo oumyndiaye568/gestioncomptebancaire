@@ -27,6 +27,7 @@ return [
                     'name' => 'Local Development Server',
                 ],
             ],
+            'basePath' => env('L5_SWAGGER_BASE_PATH', null),
             'additional_config_url' => null,
             'validator_url' => null,
             'paths' => [
