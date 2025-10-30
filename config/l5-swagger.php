@@ -30,6 +30,15 @@ return [
             'basePath' => env('L5_SWAGGER_BASE_PATH', null),
             'additional_config_url' => null,
             'validator_url' => null,
+
+            /*
+             * Swagger UI configuration for CORS and headers
+             */
+            'swagger_ui_config' => [
+                'persistAuthorization' => true,
+                'displayRequestDuration' => true,
+                'tryItOutEnabled' => true,
+            ],
             'paths' => [
                 /*
                  * Edit to include full URL in ui for assets
