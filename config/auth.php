@@ -42,12 +42,12 @@ return [
        ],
 
        'admin' => [
-           'driver' => 'sanctum',
+           'driver' => 'passport',
            'provider' => 'admins',
        ],
 
        'client' => [
-           'driver' => 'sanctum',
+           'driver' => 'passport',
            'provider' => 'clients',
        ],
    ],

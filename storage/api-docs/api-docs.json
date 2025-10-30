@@ -2,23 +2,27 @@
     "openapi": "3.0.0",
     "info": {
         "title": "API Gestion de Comptes Bancaires",
-        "description": "API pour la gestion des comptes bancaires avec authentification admin",
+        "description": "API pour la gestion des comptes bancaires avec authentification OAuth2",
         "version": "1.0.0"
     },
     "servers": [
         {
+            "url": "http://127.0.0.1:8000",
+            "description": "Serveur de développement local"
+        },
+        {
             "url": "https://gestioncomptebancaire.onrender.com/",
-            "description": "Serveur de développement"
+            "description": "Serveur de production"
         }
     ],
     "paths": {
-        "/api/auth/login": {
+        "/api/v1/auth/login": {
             "post": {
                 "tags": [
                     "Authentification"
                 ],
                 "summary": "Connexion administrateur",
-                "description": "Authentifie un administrateur et retourne un token d'accès",
+                "description": "Authentifie un administrateur et retourne un token d'accès avec claims personnalisés",
                 "operationId": "adminLogin",
                 "requestBody": {
                     "required": true,
@@ -53,26 +57,113 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "admin": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
                                             "properties": {
-                                                "id": {
+                                                "access_token": {
                                                     "type": "string",
-                                                    "example": "uuid"
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
                                                 },
-                                                "nom": {
+                                                "token_type": {
                                                     "type": "string",
-                                                    "example": "Admin Test"
+                                                    "example": "Bearer"
                                                 },
-                                                "email": {
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                },
+                                                "refresh_token": {
                                                     "type": "string",
-                                                    "example": "admin@test.com"
+                                                    "example": "def50200..."
+                                                },
+                                                "admin": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string",
+                                                            "example": "uuid"
+                                                        },
+                                                        "nom": {
+                                                            "type": "string",
+                                                            "example": "Admin Test"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "admin@test.com"
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "admin"
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
                                         },
-                                        "token": {
+                                        "message": {
                                             "type": "string",
-                                            "example": "1|abc123..."
+                                            "example": "Connexion réussie"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Token OAuth2 créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "access_token": {
+                                                    "type": "string",
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
+                                                },
+                                                "token_type": {
+                                                    "type": "string",
+                                                    "example": "Bearer"
+                                                },
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                },
+                                                "admin": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string",
+                                                            "example": "uuid"
+                                                        },
+                                                        "nom": {
+                                                            "type": "string",
+                                                            "example": "Admin Test"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "admin@test.com"
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "admin"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Connexion réussie"
                                         }
                                     },
                                     "type": "object"
@@ -86,9 +177,17 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Identifiants invalides"
+                                        },
                                         "error": {
                                             "type": "string",
-                                            "example": "Unauthorized"
+                                            "example": "invalid_credentials"
                                         }
                                     },
                                     "type": "object"
@@ -328,7 +427,7 @@
                                             "properties": {
                                                 "self": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8001/api/admin/comptes"
+                                                    "example": "http://127.0.0.1:8000/api/admin/comptes"
                                                 },
                                                 "next": {
                                                     "type": "string",
@@ -337,11 +436,11 @@
                                                 },
                                                 "first": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8001/api/admin/comptes?page=1"
+                                                    "example": "http://127.0.0.1:8000/api/admin/comptes?page=1"
                                                 },
                                                 "last": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8001/api/admin/comptes?page=1"
+                                                    "example": "http://127.0.0.1:8000/api/admin/comptes?page=1"
                                                 }
                                             },
                                             "type": "object"
@@ -387,13 +486,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
-                    }
-                ],
-                "servers": [
-                    {
-                        "url": "https://gestioncomptebancaire.onrender.com/",
-                        "description": "Serveur de production"
+                        "passport": []
                     }
                 ]
             },
@@ -567,7 +660,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             }
@@ -753,7 +846,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             },
@@ -957,7 +1050,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             },
@@ -1097,7 +1190,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -1239,7 +1332,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -1381,7 +1474,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             }
@@ -1550,7 +1643,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             }
@@ -1713,7 +1806,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
                     }
                 ]
             }
@@ -1860,7 +1953,205 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "passport": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Rafraîchir le token d'accès",
+                "description": "Renouvelle le token d'accès en utilisant le refresh token",
+                "operationId": "refreshToken",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refresh_token"
+                                ],
+                                "properties": {
+                                    "refresh_token": {
+                                        "type": "string",
+                                        "example": "def50200..."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Token rafraîchi avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "access_token": {
+                                                    "type": "string",
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
+                                                },
+                                                "token_type": {
+                                                    "type": "string",
+                                                    "example": "Bearer"
+                                                },
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Token rafraîchi avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Nouveau token OAuth2 généré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "access_token": {
+                                                    "type": "string",
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
+                                                },
+                                                "token_type": {
+                                                    "type": "string",
+                                                    "example": "Bearer"
+                                                },
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Token rafraîchi avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Refresh token invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Refresh token invalide"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Déconnexion administrateur",
+                "description": "Invalide le token d'accès actuel",
+                "operationId": "logout",
+                "responses": {
+                    "200": {
+                        "description": "Déconnexion réussie",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Déconnexion réussie"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Tokens OAuth2 révoqués avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Déconnexion réussie"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -1906,26 +2197,113 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "client": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
                                             "properties": {
-                                                "id": {
+                                                "access_token": {
                                                     "type": "string",
-                                                    "example": "uuid"
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
                                                 },
-                                                "nom_complet": {
+                                                "token_type": {
                                                     "type": "string",
-                                                    "example": "John Doe"
+                                                    "example": "Bearer"
                                                 },
-                                                "email": {
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                },
+                                                "refresh_token": {
                                                     "type": "string",
-                                                    "example": "client@example.com"
+                                                    "example": "def50200..."
+                                                },
+                                                "client": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string",
+                                                            "example": "uuid"
+                                                        },
+                                                        "nom_complet": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "client@example.com"
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "client"
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
                                         },
-                                        "token": {
+                                        "message": {
                                             "type": "string",
-                                            "example": "1|abc123..."
+                                            "example": "Connexion client réussie"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Token OAuth2 créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "access_token": {
+                                                    "type": "string",
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
+                                                },
+                                                "token_type": {
+                                                    "type": "string",
+                                                    "example": "Bearer"
+                                                },
+                                                "expires_in": {
+                                                    "type": "integer",
+                                                    "example": 31536000
+                                                },
+                                                "client": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string",
+                                                            "example": "uuid"
+                                                        },
+                                                        "nom_complet": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "client@example.com"
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "client"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Connexion client réussie"
                                         }
                                     },
                                     "type": "object"
@@ -1939,9 +2317,13 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "error": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
                                             "type": "string",
-                                            "example": "Unauthorized"
+                                            "example": "Identifiants incorrects"
                                         }
                                     },
                                     "type": "object"
@@ -2022,6 +2404,10 @@
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Comptes récupérés avec succès"
                                         }
                                     },
                                     "type": "object"
@@ -2035,9 +2421,13 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "error": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
                                             "type": "string",
-                                            "example": "Unauthorized"
+                                            "example": "Accès réservé aux clients"
                                         }
                                     },
                                     "type": "object"
@@ -2048,7 +2438,7 @@
                 },
                 "security": [
                     {
-                        "sanctum": []
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -2056,30 +2446,35 @@
     },
     "components": {
         "securitySchemes": {
-            "sanctum": {
-                "type": "apiKey",
-                "description": "Enter token in format (Bearer <token>)",
-                "name": "Authorization",
-                "in": "header"
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Authentification Bearer Token OAuth2 pour les administrateurs et clients"
             }
         }
     },
     "tags": [
         {
+            "name": "Authentification",
+            "description": "Endpoints d'authentification OAuth2"
+        },
+        {
+            "name": "Comptes",
+            "description": "Gestion des comptes bancaires"
+        },
+        {
             "name": "Authentification Client",
-            "description": "Endpoints d'authentification pour les clients"
+            "description": "Endpoints d'authentification OAuth2 pour les clients"
         },
         {
             "name": "Comptes Client",
             "description": "Gestion des comptes pour les clients"
-        },
+        }
+    ],
+    "security": [
         {
-            "name": "Authentification",
-            "description": "Authentification"
-        },
-        {
-            "name": "Comptes",
-            "description": "Comptes"
+            "bearerAuth": []
         }
     ]
 }

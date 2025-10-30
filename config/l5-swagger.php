@@ -18,13 +18,13 @@ return [
                 /*
                  * Edit to set the swagger-ui base URL for development
                  */
-                'production' => [
-                    'url' => 'https://gestioncomptebancaire.onrender.com',
-                    'name' => 'Production Server',
-                ],
                 'local' => [
                     'url' => 'http://127.0.0.1:8000',
                     'name' => 'Local Development Server',
+                ],
+                'production' => [
+                    'url' => 'https://gestioncomptebancaire.onrender.com',
+                    'name' => 'Production Server',
                 ],
             ],
             'basePath' => env('L5_SWAGGER_BASE_PATH', null),
@@ -197,29 +197,19 @@ return [
 
         /*
          * API security definitions. Will be generated into documentation file.
-        */
+         */
         'securityDefinitions' => [
         'securitySchemes' => [
-            'sanctum' => [
-                'type' => 'apiKey',
-                'description' => 'Enter token in format (Bearer <token>)',
-                'name' => 'Authorization',
-                'in' => 'header',
+            'bearerAuth' => [
+                'type' => 'http',
+                'scheme' => 'bearer',
+                'bearerFormat' => 'JWT',
+                'description' => 'Authentification Bearer Token OAuth2 pour les administrateurs et clients'
             ],
         ],
             'security' => [
-                /*
-                 * Examples of Securities
-                 */
                 [
-                    /*
-                    'oauth2_security_example' => [
-                        'read',
-                        'write'
-                    ],
-
-                    'passport' => []
-                    */
+                    'bearerAuth' => []
                 ],
             ],
         ],

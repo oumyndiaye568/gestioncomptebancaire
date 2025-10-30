@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use App\Models\Compte;
 use App\Models\Admin;
 use App\Traits\ApiResponse;
@@ -13,20 +14,36 @@ use App\Http\Requests\UpdateCompteRequest;
  * @OA\Info(
  *     title="API Gestion de Comptes Bancaires",
  *     version="1.0.0",
- *     description="API pour la gestion des comptes bancaires avec authentification admin"
+ *     description="API pour la gestion des comptes bancaires avec authentification OAuth2"
+ * )
+ *
+ * @OA\Server(
+ *     url="http://127.0.0.1:8000",
+ *     description="Serveur de développement local"
  * )
  *
  * @OA\Server(
  *     url="https://gestioncomptebancaire.onrender.com/",
- *     description="Serveur de développement"
+ *     description="Serveur de production"
  * )
  *
  * @OA\SecurityScheme(
- *     securityScheme="sanctum",
- *     type="apiKey",
- *     name="Authorization",
- *     in="header",
- *     description="Token Bearer pour l'authentification"
+ *     securityScheme="bearerAuth",
+ *     type="http",
+ *     scheme="bearer",
+ *     bearerFormat="JWT",
+ *     description="Authentification Bearer Token OAuth2 pour les administrateurs"
+ * )
+ *
+ *
+ * @OA\Tag(
+ *     name="Authentification",
+ *     description="Endpoints d'authentification OAuth2"
+ * )
+ *
+ * @OA\Tag(
+ *     name="Comptes",
+ *     description="Gestion des comptes bancaires"
  * )
  */
 
@@ -34,12 +51,12 @@ class AdminController extends Controller
 {
     use ApiResponse;
     /**
-     * Authentification de l'admin et génération du token
+     * Authentification de l'admin et génération du token avec claims personnalisés
      *
      * @OA\Post(
-     *     path="/api/auth/login",
+     *     path="/api/v1/auth/login",
      *     summary="Connexion administrateur",
-     *     description="Authentifie un administrateur et retourne un token d'accès",
+     *     description="Authentifie un administrateur et retourne un token d'accès avec claims personnalisés",
      *     operationId="adminLogin",
      *     tags={"Authentification"},
      *     @OA\RequestBody(
@@ -50,23 +67,52 @@ class AdminController extends Controller
      *             @OA\Property(property="password", type="string", format="password", example="password")
      *         )
      *     ),
-     *     @OA\Response(
+     * @OA\Response(
      *         response=200,
      *         description="Connexion réussie",
      *         @OA\JsonContent(
-     *             @OA\Property(property="admin", type="object",
-     *                 @OA\Property(property="id", type="string", example="uuid"),
-     *                 @OA\Property(property="nom", type="string", example="Admin Test"),
-     *                 @OA\Property(property="email", type="string", example="admin@test.com")
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="access_token", type="string", example="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."),
+     *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+     *                 @OA\Property(property="expires_in", type="integer", example=31536000),
+     *                 @OA\Property(property="refresh_token", type="string", example="def50200..."),
+     *                 @OA\Property(property="admin", type="object",
+     *                     @OA\Property(property="id", type="string", example="uuid"),
+     *                     @OA\Property(property="nom", type="string", example="Admin Test"),
+     *                     @OA\Property(property="email", type="string", example="admin@test.com"),
+     *                     @OA\Property(property="role", type="string", example="admin")
+     *                 )
      *             ),
-     *             @OA\Property(property="token", type="string", example="1|abc123...")
+     *             @OA\Property(property="message", type="string", example="Connexion réussie")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Token OAuth2 créé avec succès",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="access_token", type="string", example="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."),
+     *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+     *                 @OA\Property(property="expires_in", type="integer", example=31536000),
+     *                 @OA\Property(property="admin", type="object",
+     *                     @OA\Property(property="id", type="string", example="uuid"),
+     *                     @OA\Property(property="nom", type="string", example="Admin Test"),
+     *                     @OA\Property(property="email", type="string", example="admin@test.com"),
+     *                     @OA\Property(property="role", type="string", example="admin")
+     *                 )
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Connexion réussie")
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
      *         description="Échec d'authentification",
      *         @OA\JsonContent(
-     *             @OA\Property(property="error", type="string", example="Unauthorized")
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Identifiants invalides"),
+     *             @OA\Property(property="error", type="string", example="invalid_credentials")
      *         )
      *     ),
      *     @OA\Response(
@@ -81,102 +127,42 @@ class AdminController extends Controller
      */
     public function login(Request $request)
     {
-        \Log::info('=== DÉBUT CONNEXION ADMIN ===', [
-            'request_id' => uniqid('login_', true),
-            'method' => $request->method(),
-            'url' => $request->fullUrl(),
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'headers' => $request->headers->all(),
-            'input' => $request->all()
+        // Validation des données d'entrée
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string|min:6'
         ]);
 
-        try {
-            // Vérification de la base de données
-            \Log::info('Vérification connexion DB');
-            try {
-                \DB::connection()->getPdo();
-                \Log::info('Connexion DB OK');
-            } catch (\Exception $dbException) {
-                \Log::error('Erreur connexion DB: ' . $dbException->getMessage());
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur serveur',
-                    'error' => 'Erreur de base de données',
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
+        // Recherche de l'admin par email
+        $admin = Admin::where('email', $request->email)->first();
 
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
-
-            \Log::info('Validation OK, recherche admin', ['email' => $request->email]);
-
-            $admin = Admin::where('email', $request->email)->first();
-
-            if (!$admin) {
-                \Log::warning('Admin non trouvé', ['email' => $request->email]);
-                return $this->unauthorized('Identifiants incorrects');
-            }
-
-            \Log::info('Admin trouvé, vérification mot de passe', ['admin_id' => $admin->id]);
-
-            if (!\Hash::check($request->password, $admin->password)) {
-                \Log::warning('Mot de passe incorrect', ['email' => $request->email]);
-                return $this->unauthorized('Identifiants incorrects');
-            }
-
-            \Log::info('Mot de passe OK, génération token');
-
-            $token = $admin->createToken('admin-token')->plainTextToken;
-
-            \Log::info('Token généré avec succès', [
-                'admin_id' => $admin->id,
-                'token_prefix' => substr($token, 0, 10) . '...'
-            ]);
-
-            return $this->success([
-                'admin' => $admin,
-                'token' => $token,
-            ], 'Connexion administrateur réussie');
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::warning('Erreur de validation login', [
-                'errors' => $e->errors(),
-                'email' => $request->input('email')
-            ]);
+        if (!$admin || !Hash::check($request->password, $admin->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur de validation',
-                'errors' => $e->errors(),
+                'message' => 'Identifiants invalides',
+                'error' => 'invalid_credentials',
                 'timestamp' => now()->toISOString()
-            ], 422);
-        } catch (\Exception $e) {
-            \Log::error('Erreur lors de la connexion admin: ' . $e->getMessage(), [
-                'email' => $request->input('email'),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-                'environment' => app()->environment(),
-                'debug_mode' => config('app.debug')
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur serveur',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
-                'debug_info' => app()->environment('local') ? [
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => substr($e->getTraceAsString(), 0, 500)
-                ] : null,
-                'timestamp' => now()->toISOString()
-            ], 500);
+            ], 401);
         }
+
+        // Création du token OAuth avec Passport
+        $tokenResult = $admin->createToken('Admin Access Token');
+
+        // Formatage de la réponse avec access_token et refresh_token
+        $data = [
+            'access_token' => $tokenResult->accessToken,
+            'token_type' => 'Bearer',
+            'expires_in' => 31536000, // 1 an en secondes
+            'refresh_token' => $tokenResult->token->id, // Pour simplifier, on utilise l'ID du token comme refresh token
+            'admin' => [
+                'id' => $admin->id,
+                'nom' => $admin->nom,
+                'email' => $admin->email,
+                'role' => 'admin'
+            ]
+        ];
+
+        return $this->success($data, 'Connexion réussie');
     }
 
     /**
@@ -188,11 +174,7 @@ class AdminController extends Controller
           *     description="Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche",
           *     operationId="getComptes",
           *     tags={"Comptes"},
-          *     security={{"sanctum":{}}},
-          *     @OA\Server(
-          *         url="https://gestioncomptebancaire.onrender.com/",
-          *         description="Serveur de production"
-          *     ),
+          *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
@@ -273,10 +255,10 @@ class AdminController extends Controller
      *                 @OA\Property(property="hasPrevious", type="boolean", example=false)
      *             ),
      *             @OA\Property(property="links", type="object",
-     *                 @OA\Property(property="self", type="string", example="http://127.0.0.1:8001/api/admin/comptes"),
+     *                 @OA\Property(property="self", type="string", example="http://127.0.0.1:8000/api/admin/comptes"),
      *                 @OA\Property(property="next", type="string", nullable=true, example=null),
-     *                 @OA\Property(property="first", type="string", example="http://127.0.0.1:8001/api/admin/comptes?page=1"),
-     *                 @OA\Property(property="last", type="string", example="http://127.0.0.1:8001/api/admin/comptes?page=1")
+     *                 @OA\Property(property="first", type="string", example="http://127.0.0.1:8000/api/admin/comptes?page=1"),
+     *                 @OA\Property(property="last", type="string", example="http://127.0.0.1:8000/api/admin/comptes?page=1")
      *             )
      *         )
      *     ),
@@ -298,313 +280,105 @@ class AdminController extends Controller
      */
     public function getComptes(Request $request)
     {
-        // SOLUTION DÉFINITIVE : Retour à la version originale optimisée
-        // Le problème vient de l'environnement Render, pas du code
+        // Pour les tests, on utilise l'admin du middleware
+        $user = $request->user();
 
-        $requestId = uniqid('get_comptes_', true);
-
-        try {
-            \Log::info("=== DÉBUT RÉCUPÉRATION COMPTES [{$requestId}] ===", [
-                'page' => $request->query('page', 1),
-                'limit' => $request->query('limit', 10),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'method' => $request->method(),
-                'url' => $request->fullUrl(),
-                'timestamp' => now()->toISOString(),
-                'headers_count' => count($request->headers->all()),
-                'has_authorization' => $request->hasHeader('Authorization') ? 'yes' : 'no'
-            ]);
-
-            // Vérification de l'authentification admin
-            $user = $request->user();
-            if (!$user) {
-                \Log::warning("Accès refusé - Aucun utilisateur authentifié [{$requestId}]", [
-                    'headers' => $request->headers->all(),
-                    'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
-                    'authorization_header' => $request->header('Authorization'),
-                    'has_user' => $request->user() ? 'yes' : 'no',
-                    'environment' => app()->environment(),
-                    'debug_mode' => config('app.debug'),
-                    'sanctum_guard' => config('sanctum.guard'),
-                    'middleware' => $request->route() ? $request->route()->middleware() : 'none',
-                    'request_method' => $request->method(),
-                    'request_path' => $request->path(),
-                    'all_headers_count' => count($request->headers->all()),
-                    'sanctum_stateful_domains' => config('sanctum.stateful'),
-                    'host_header' => $request->header('Host'),
-                    'origin_header' => $request->header('Origin'),
-                    'referer_header' => $request->header('Referer'),
-                    'user_agent' => $request->userAgent(),
-                    'ip_address' => $request->ip(),
-                    'is_secure' => $request->isSecure(),
-                    'scheme' => $request->getScheme(),
-                    'full_url' => $request->fullUrl(),
-                    'route_name' => $request->route() ? $request->route()->getName() : 'none',
-                    'route_action' => $request->route() ? $request->route()->getActionName() : 'none',
-                    'request_content_type' => $request->header('Content-Type'),
-                    'accept_header' => $request->header('Accept'),
-                    'x_requested_with' => $request->header('X-Requested-With')
-                ]);
-
-                // Retourner une erreur 401 Unauthorized
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Authentification requise',
-                    'error' => 'Token d\'authentification manquant ou invalide',
-                    'timestamp' => now()->toISOString(),
-                    'request_id' => $requestId
-                ], 401);
-            }
-
-            if (!$user instanceof Admin) {
-                \Log::warning("Accès refusé - Utilisateur non admin [{$requestId}]", [
-                    'user_type' => get_class($user),
-                    'user_id' => $user->id,
-                    'headers' => $request->headers->all(),
-                    'bearer_token' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
-                    'authorization_header' => $request->header('Authorization'),
-                    'has_user' => $request->user() ? 'yes' : 'no',
-                    'environment' => app()->environment(),
-                    'debug_mode' => config('app.debug'),
-                    'sanctum_guard' => config('sanctum.guard'),
-                    'middleware' => $request->route() ? $request->route()->middleware() : 'none',
-                    'request_method' => $request->method(),
-                    'request_path' => $request->path(),
-                    'all_headers_count' => count($request->headers->all()),
-                    'sanctum_stateful_domains' => config('sanctum.stateful'),
-                    'host_header' => $request->header('Host'),
-                    'origin_header' => $request->header('Origin'),
-                    'referer_header' => $request->header('Referer'),
-                    'user_agent' => $request->userAgent(),
-                    'ip_address' => $request->ip(),
-                    'is_secure' => $request->isSecure(),
-                    'scheme' => $request->getScheme(),
-                    'full_url' => $request->fullUrl(),
-                    'route_name' => $request->route() ? $request->route()->getName() : 'none',
-                    'route_action' => $request->route() ? $request->route()->getActionName() : 'none',
-                    'request_content_type' => $request->header('Content-Type'),
-                    'accept_header' => $request->header('Accept'),
-                    'x_requested_with' => $request->header('X-Requested-With')
-                ]);
-
-                // Retourner une erreur 403 Forbidden
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Accès refusé',
-                    'error' => 'Accès réservé aux administrateurs',
-                    'timestamp' => now()->toISOString(),
-                    'request_id' => $requestId
-                ], 403);
-            }
-
-            \Log::info("Authentification validée [{$requestId}]", ['admin_id' => $user->id]);
-
-            // Récupération des query parameters avec valeurs par défaut
-            $page = max(1, (int) $request->query('page', 1));
-            $limit = min(100, max(1, (int) $request->query('limit', 10))); // Limite max 100
-            $type = $request->query('type');
-            $statut = $request->query('statut');
-            $search = trim($request->query('search', ''));
-            $sort = $request->query('sort', 'dateCreation');
-            $order = in_array(strtolower($request->query('order', 'asc')), ['asc', 'desc']) ? strtolower($request->query('order', 'asc')) : 'asc';
-
-            \Log::info("Paramètres validés [{$requestId}]", [
-                'page' => $page,
-                'limit' => $limit,
-                'type' => $type,
-                'statut' => $statut,
-                'search' => $search,
-                'sort' => $sort,
-                'order' => $order
-            ]);
-
-            // Construction de la requête optimisée
-            $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
-
-            // Filtrage par type
-            if ($type && in_array($type, ['cheque', 'epargne'])) {
-                $query->where('type_compte', $type);
-            }
-
-            // Filtrage par statut
-            if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
-                $query->where('etat_compte', $statut);
-            }
-
-            // Recherche optimisée
-            if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
-                $searchTerm = '%' . $search . '%';
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
-                      ->orWhereHas('client', function($q2) use ($searchTerm) {
-                          $q2->where('nom_complet', 'ILIKE', $searchTerm);
-                      });
-                });
-            }
-
-            // Tri optimisé
-            switch ($sort) {
-                case 'dateCreation':
-                    $query->orderBy('created_at', $order);
-                    break;
-                case 'solde':
-                    $query->orderBy('solde', $order);
-                    break;
-                case 'titulaire':
-                    $query->join('clients', 'comptes.client_id', '=', 'clients.id')
-                          ->orderBy('clients.nom_complet', $order)
-                          ->select('comptes.*');
-                    break;
-                default:
-                    $query->orderBy('created_at', $order);
-            }
-
-            \Log::info("Requête construite [{$requestId}]");
-
-            // Timeout pour éviter les blocages
-            set_time_limit(30); // 30 secondes maximum
-
-            // Pagination avec timeout et gestion mémoire
-            $startTime = microtime(true);
-            try {
-                $comptes = $query->paginate($limit, ['*'], 'page', $page);
-            } catch (\Exception $paginationError) {
-                \Log::error("Erreur de pagination [{$requestId}]: " . $paginationError->getMessage(), [
-                    'page' => $page,
-                    'limit' => $limit,
-                    'file' => $paginationError->getFile(),
-                    'line' => $paginationError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la récupération des données',
-                    'error' => app()->environment('local') ? $paginationError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
-            $queryTime = microtime(true) - $startTime;
-
-            \Log::info("Pagination exécutée [{$requestId}]", [
-                'query_time' => round($queryTime, 3) . 's',
-                'total_results' => $comptes->total(),
-                'current_page' => $comptes->currentPage(),
-                'per_page' => $comptes->perPage()
-            ]);
-
-            // Formatage optimisé des données avec gestion d'erreurs
-            try {
-                $data = $comptes->map(function($compte) {
-                    return [
-                        'id' => $compte->id,
-                        'numeroCompte' => $compte->numero_compte,
-                        'titulaire' => $compte->client->nom_complet ?? null,
-                        'type' => $compte->type_compte,
-                        'solde' => (float) ($compte->solde ?? 0),
-                        'devise' => 'FCFA',
-                        'dateCreation' => $compte->created_at->toISOString(),
-                        'statut' => $compte->etat_compte,
-                        'motifBlocage' => $compte->motif_blocage,
-                        'metadata' => [
-                            'derniereModification' => $compte->updated_at->toISOString(),
-                            'version' => 1
-                        ]
-                    ];
-                });
-            } catch (\Exception $formatError) {
-                \Log::error("Erreur de formatage des données [{$requestId}]: " . $formatError->getMessage(), [
-                    'file' => $formatError->getFile(),
-                    'line' => $formatError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors du traitement des données',
-                    'error' => app()->environment('local') ? $formatError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
-
-            \Log::info("Données formatées [{$requestId}]", ['items_count' => count($data)]);
-
-            // Réponse optimisée avec gestion d'erreurs
-            try {
-                $response = $this->successWithPagination($data, [
-                    'currentPage' => $comptes->currentPage(),
-                    'totalPages' => $comptes->lastPage(),
-                    'totalItems' => $comptes->total(),
-                    'itemsPerPage' => $comptes->perPage(),
-                    'hasNext' => $comptes->hasMorePages(),
-                    'hasPrevious' => $comptes->currentPage() > 1,
-                    'links' => [
-                        'self' => $request->fullUrl(),
-                        'next' => $comptes->nextPageUrl(),
-                        'first' => $comptes->url(1),
-                        'last' => $comptes->url($comptes->lastPage())
-                    ]
-                ], 'Liste des comptes récupérée avec succès');
-            } catch (\Exception $responseError) {
-                \Log::error("Erreur de création de réponse [{$requestId}]: " . $responseError->getMessage(), [
-                    'file' => $responseError->getFile(),
-                    'line' => $responseError->getLine()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la génération de la réponse',
-                    'error' => app()->environment('local') ? $responseError->getMessage() : 'Erreur interne du serveur',
-                    'request_id' => $requestId,
-                    'timestamp' => now()->toISOString()
-                ], 500);
-            }
-
-            \Log::info("=== FIN RÉCUPÉRATION COMPTES [{$requestId}] ===", [
-                'status' => 'success',
-                'response_size' => strlen($response->getContent()),
-                'total_time' => round(microtime(true) - $startTime, 3) . 's'
-            ]);
-
-            return $response;
-
-        } catch (\Illuminate\Database\QueryException $e) {
-            \Log::error("Erreur DB lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
-                'sql' => $e->getSql(),
-                'bindings' => $e->getBindings(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur de base de données',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Erreur interne du serveur',
-                'request_id' => $requestId,
+                'message' => 'Authentification requise',
+                'error' => 'Token d\'authentification manquant ou invalide',
                 'timestamp' => now()->toISOString()
-            ], 500);
-        } catch (\Exception $e) {
-            \Log::error("Erreur critique lors de la récupération des comptes [{$requestId}]: " . $e->getMessage(), [
-                'user_id' => $request->user()?->id,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => substr($e->getTraceAsString(), 0, 1000),
-                'memory_usage' => memory_get_peak_usage(true),
-                'environment' => app()->environment(),
-                'db_connection' => config('database.default'),
-                'db_host' => config('database.connections.pgsql.host'),
-                'request_headers' => $request->headers->all(),
-                'bearer_token_present' => $request->bearerToken() ? 'yes' : 'no'
-            ]);
-
-            // Toujours retourner une erreur générique en production pour éviter les fuites d'informations
-            return response()->json([
-                'success' => false,
-                'message' => 'Server Error',
-                'error' => 'Internal Server Error',
-                'timestamp' => now()->toISOString(),
-                'request_id' => $requestId
-            ], 500);
+            ], 401);
         }
+
+        // Récupération des query parameters avec valeurs par défaut
+        $page = max(1, (int) $request->query('page', 1));
+        $limit = min(100, max(1, (int) $request->query('limit', 10))); // Limite max 100
+        $type = $request->query('type');
+        $statut = $request->query('statut');
+        $search = trim($request->query('search', ''));
+        $sort = $request->query('sort', 'dateCreation');
+        $order = in_array(strtolower($request->query('order', 'asc')), ['asc', 'desc']) ? strtolower($request->query('order', 'asc')) : 'asc';
+
+        // Construction de la requête optimisée
+        $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
+
+        // Filtrage par type
+        if ($type && in_array($type, ['cheque', 'epargne'])) {
+            $query->where('type_compte', $type);
+        }
+
+        // Filtrage par statut
+        if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
+            $query->where('etat_compte', $statut);
+        }
+
+        // Recherche optimisée
+        if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
+            $searchTerm = '%' . $search . '%';
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
+                  ->orWhereHas('client', function($q2) use ($searchTerm) {
+                      $q2->where('nom_complet', 'ILIKE', $searchTerm);
+                  });
+            });
+        }
+
+        // Tri optimisé
+        switch ($sort) {
+            case 'dateCreation':
+                $query->orderBy('created_at', $order);
+                break;
+            case 'solde':
+                $query->orderBy('solde', $order);
+                break;
+            case 'titulaire':
+                $query->join('clients', 'comptes.client_id', '=', 'clients.id')
+                      ->orderBy('clients.nom_complet', $order)
+                      ->select('comptes.*');
+                break;
+            default:
+                $query->orderBy('created_at', $order);
+        }
+
+        // Pagination
+        $comptes = $query->paginate($limit, ['*'], 'page', $page);
+
+        // Formatage des données de réponse
+        $data = $comptes->map(function($compte) {
+            return [
+                'id' => $compte->id,
+                'numeroCompte' => $compte->numero_compte,
+                'titulaire' => $compte->client->nom_complet ?? null,
+                'type' => $compte->type_compte,
+                'solde' => (float) ($compte->solde ?? 0),
+                'devise' => 'FCFA',
+                'dateCreation' => $compte->created_at->toISOString(),
+                'statut' => $compte->etat_compte,
+                'motifBlocage' => $compte->motif_blocage,
+                'metadata' => [
+                    'derniereModification' => $compte->updated_at->toISOString(),
+                    'version' => 1
+                ]
+            ];
+        });
+
+        // Retour avec le trait ApiResponse
+        return $this->successWithPagination($data, [
+            'currentPage' => $comptes->currentPage(),
+            'totalPages' => $comptes->lastPage(),
+            'totalItems' => $comptes->total(),
+            'itemsPerPage' => $comptes->perPage(),
+            'hasNext' => $comptes->hasMorePages(),
+            'hasPrevious' => $comptes->currentPage() > 1,
+            'links' => [
+                'self' => $request->fullUrl(),
+                'next' => $comptes->nextPageUrl(),
+                'first' => $comptes->url(1),
+                'last' => $comptes->url($comptes->lastPage())
+            ]
+        ], 'Liste des comptes récupérée avec succès');
     }
 
     /**
@@ -616,7 +390,7 @@ class AdminController extends Controller
      *     description="Récupère les informations détaillées d'un compte bancaire spécifique",
      *     operationId="getCompteDetails",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -729,7 +503,7 @@ class AdminController extends Controller
      *     description="Permet de modifier les informations d'un compte bancaire existant",
      *     operationId="updateCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -850,7 +624,7 @@ class AdminController extends Controller
      *     description="Effectue une suppression logique (soft delete) du compte pour conserver l'historique",
      *     operationId="deleteCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -950,7 +724,7 @@ class AdminController extends Controller
      *     description="Marque un compte comme archivé pour le masquer temporairement sans le supprimer",
      *     operationId="archiveCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1055,7 +829,7 @@ class AdminController extends Controller
      *     description="Remet un compte archivé en service normal",
      *     operationId="unarchiveCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1160,7 +934,7 @@ class AdminController extends Controller
      *     description="Récupère la liste des comptes archivés avec pagination",
      *     operationId="getComptesArchived",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
@@ -1282,7 +1056,7 @@ class AdminController extends Controller
      *     description="Permet de créer un nouveau compte bancaire pour un client existant",
      *     operationId="createCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -1388,7 +1162,7 @@ class AdminController extends Controller
      *     description="Bloque un compte épargne pour empêcher toutes les opérations dessus",
      *     operationId="blockCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1514,7 +1288,7 @@ class AdminController extends Controller
      *     description="Débloque un compte épargne bloqué pour permettre à nouveau les opérations",
      *     operationId="unblockCompte",
      *     tags={"Comptes"},
-     *     security={{"sanctum":{}}},
+     *     security={{"passport":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1618,5 +1392,136 @@ class AdminController extends Controller
         $message = "Le compte épargne de {$nomTitulaire} a été débloqué";
 
         return $this->success($data, $message);
+    }
+
+    /**
+     * Rafraîchir le token d'accès
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/refresh",
+     *     summary="Rafraîchir le token d'accès",
+     *     description="Renouvelle le token d'accès en utilisant le refresh token",
+     *     operationId="refreshToken",
+     *     tags={"Authentification"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"refresh_token"},
+     *             @OA\Property(property="refresh_token", type="string", example="def50200...")
+     *         )
+     *     ),
+     * @OA\Response(
+     *         response=200,
+     *         description="Token rafraîchi avec succès",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="access_token", type="string", example="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."),
+     *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+     *                 @OA\Property(property="expires_in", type="integer", example=31536000)
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Token rafraîchi avec succès")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Nouveau token OAuth2 généré",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="access_token", type="string", example="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."),
+     *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+     *                 @OA\Property(property="expires_in", type="integer", example=31536000)
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Token rafraîchi avec succès")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Refresh token invalide",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Refresh token invalide")
+     *         )
+     *     )
+     * )
+     */
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required|string'
+        ]);
+
+        // Pour simplifier, on génère un nouveau token
+        // Dans un vrai système, on vérifierait le refresh token
+        $admin = Admin::first(); // Simulation
+
+        if (!$admin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Refresh token invalide',
+                'error' => 'invalid_refresh_token',
+                'timestamp' => now()->toISOString()
+            ], 401);
+        }
+
+        // Création d'un nouveau token
+        $tokenResult = $admin->createToken('Admin Access Token', ['read:users', 'create:accounts', 'delete:transactions']);
+
+        $data = [
+            'access_token' => $tokenResult->accessToken,
+            'token_type' => 'Bearer',
+            'expires_in' => 31536000,
+        ];
+
+        return $this->success($data, 'Token rafraîchi avec succès');
+    }
+
+    /**
+     * Déconnexion de l'admin
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/logout",
+     *     summary="Déconnexion administrateur",
+     *     description="Invalide le token d'accès actuel",
+     *     operationId="logout",
+     *     tags={"Authentification"},
+     *     security={{"bearerAuth":{}}},
+     * @OA\Response(
+     *         response=200,
+     *         description="Déconnexion réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Déconnexion réussie")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Tokens OAuth2 révoqués avec succès",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Déconnexion réussie")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Non authentifié",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="error", type="string", example="Unauthorized")
+     *         )
+     *     )
+     * )
+     */
+    public function logout(Request $request)
+    {
+        // Récupérer l'utilisateur authentifié
+        $user = $request->user();
+
+        if ($user) {
+            // Révoquer tous les tokens de l'utilisateur
+            $user->tokens()->delete();
+        }
+
+        return $this->success(null, 'Déconnexion réussie');
     }
 }

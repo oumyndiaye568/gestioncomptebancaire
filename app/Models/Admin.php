@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Passport\HasApiTokens;
 use Illuminate\Support\Str;
 
 class Admin extends Authenticatable
@@ -53,7 +53,7 @@ class Admin extends Authenticatable
     ];
 
     /**
-     * Get the tokenable type for Sanctum
+     * Get the tokenable type for Passport
      */
     public function getMorphClass()
     {
