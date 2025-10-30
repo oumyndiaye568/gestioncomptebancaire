@@ -17,7 +17,7 @@ use App\Http\Requests\UpdateCompteRequest;
  * )
  *
  * @OA\Server(
- *     url="https://gestioncomptebancaire.onrender.com/",
+ *     url="http://127.0.0.1:8000",
  *     description="Serveur de développement"
  * )
  *

@@ -16,11 +16,15 @@ return [
             ],
             'urls' => [
                 /*
-                 * Edit to set the swagger-ui base URL
+                 * Edit to set the swagger-ui base URL for development
                  */
-                'base' => [
-                    'url' => env('L5_SWAGGER_BASE_URL', env('APP_URL', 'https://gestioncomptebancaire.onrender.com')),
-                    'name' => 'Production API',
+                'production' => [
+                    'url' => 'https://gestioncomptebancaire.onrender.com',
+                    'name' => 'Production Server',
+                ],
+                'local' => [
+                    'url' => 'http://127.0.0.1:8000',
+                    'name' => 'Local Development Server',
                 ],
             ],
             'additional_config_url' => null,
@@ -275,7 +279,7 @@ return [
                 /*
                  * If set to true, it persists authorization data, and it would not be lost on browser close/refresh
                  */
-                'persist_authorization' => env('L5_SWAGGER_UI_PERSIST_AUTHORIZATION', false),
+                'persist_authorization' => env('L5_SWAGGER_UI_PERSIST_AUTHORIZATION', true),
 
                 'oauth2' => [
                     /*
