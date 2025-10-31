@@ -32,27 +32,27 @@ Route::prefix('v1/auth')->group(function () {
 });
 
 Route::middleware(['auth:api', 'role:admin', 'logging'])->prefix('oumy/v1/admin')->group(function () {
-    // Test route pour vérifier l'authentification
-    Route::get('test-auth', function() {
-        return response()->json([
-            'success' => true,
-            'message' => 'Authentification réussie',
-            'user' => request()->user(),
-            'timestamp' => now()->toISOString()
-        ]);
-    });
+     // Test route pour vérifier l'authentification
+     Route::get('test-auth', function() {
+         return response()->json([
+             'success' => true,
+             'message' => 'Authentification réussie',
+             'user' => request()->user(),
+             'timestamp' => now()->toISOString()
+         ]);
+     });
 
-    Route::get('comptes', [AdminController::class, 'getComptes']);
-    Route::post('comptes', [AdminController::class, 'createCompte']);
-    Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
-    Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
-    Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
-    Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
-    Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
-    Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
-    Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
-    Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
-});
+     // Route::get('comptes', [AdminController::class, 'getComptes']); // Commentée pour éviter les conflits
+     Route::post('comptes', [AdminController::class, 'createCompte']);
+     Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
+     Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
+     Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
+     Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
+     Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
+     Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
+     Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
+     Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
+ });
 
 // Route de test
 Route::get('test', function() {
