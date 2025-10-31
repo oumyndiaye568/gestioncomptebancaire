@@ -367,20 +367,26 @@ class AdminController extends Controller
         })->toArray();
 
         // Retour avec le trait ApiResponse
-        return $this->successWithPagination($data, [
-            'currentPage' => $comptes->currentPage(),
-            'totalPages' => $comptes->lastPage(),
-            'totalItems' => $comptes->total(),
-            'itemsPerPage' => $comptes->perPage(),
-            'hasNext' => $comptes->hasMorePages(),
-            'hasPrevious' => $comptes->currentPage() > 1,
-            'links' => [
-                'self' => $request->fullUrl(),
-                'next' => $comptes->nextPageUrl(),
-                'first' => $comptes->url(1),
-                'last' => $comptes->url($comptes->lastPage())
-            ]
-        ], 'Liste des comptes récupérée avec succès');
+        return response()->json([
+            'success' => true,
+            'message' => 'Liste des comptes récupérée avec succès',
+            'data' => $data,
+            'pagination' => [
+                'currentPage' => $comptes->currentPage(),
+                'totalPages' => $comptes->lastPage(),
+                'totalItems' => $comptes->total(),
+                'itemsPerPage' => $comptes->perPage(),
+                'hasNext' => $comptes->hasMorePages(),
+                'hasPrevious' => $comptes->currentPage() > 1,
+                'links' => [
+                    'self' => $request->fullUrl(),
+                    'next' => $comptes->nextPageUrl(),
+                    'first' => $comptes->url(1),
+                    'last' => $comptes->url($comptes->lastPage())
+                ]
+            ],
+            'timestamp' => now()->toISOString()
+        ], 200);
     }
 
     /**
