@@ -36,12 +36,22 @@ class LoggingMiddleware
 
         // Log de l'action après traitement
         $statusCode = $response->getStatusCode();
+        $requestTime = $request->server('REQUEST_TIME_FLOAT');
+        $duration = 0;
+        if ($requestTime && is_numeric($requestTime)) {
+            try {
+                $startTime = \Carbon\Carbon::createFromTimestamp($requestTime);
+                $duration = now()->diffInMilliseconds($startTime);
+            } catch (\Exception $e) {
+                $duration = 0;
+            }
+        }
         Log::info('Action terminée', [
             'user_id' => $user ? $user->id : null,
             'method' => $method,
             'path' => $path,
             'status_code' => $statusCode,
-            'duration' => now()->diffInMilliseconds($request->server('REQUEST_TIME_FLOAT')),
+            'duration' => $duration,
             'timestamp' => now()->toISOString()
         ]);
 
