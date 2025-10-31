@@ -21,6 +21,9 @@ echo "Creating admin user after migrations"
 sleep 2
 php artisan db:seed --class=AdminSeeder --force || echo "Admin seeder failed, continuing..."
 
+echo "Installing/configuring Passport OAuth"
+php artisan passport:install --force || echo "Passport install failed, continuing..."
+
 echo "Running database seeders"
 php artisan db:seed --force || echo "Seeding failed, continuing..."
 
