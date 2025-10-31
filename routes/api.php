@@ -70,3 +70,6 @@ Route::post('client/login', [ClientController::class, 'login']);
 Route::middleware('auth:api')->prefix('client')->group(function () {
     Route::get('comptes', [ClientController::class, 'getComptes']);
 });
+
+// Route générale pour les comptes (avec authentification)
+Route::middleware('auth:api')->get('v1/comptes', [AdminController::class, 'getComptes'])->withoutMiddleware(['role:admin']);

@@ -284,14 +284,23 @@ class AdminController extends Controller
             return $this->error('Authentification requise', 401);
         }
 
-        // Vérifier que l'utilisateur est un admin
-        if (!$user instanceof Admin) {
-            return $this->forbidden('Accès réservé aux administrateurs');
+        // Vérifier que l'utilisateur est un admin ou un client
+        if (!$user instanceof Admin && !$user instanceof \App\Models\Client) {
+            return $this->forbidden('Accès réservé aux administrateurs ou clients');
         }
 
-        // Vérifier le rôle de l'utilisateur
-        if ($user->role !== 'admin') {
-            return $this->forbidden('Accès réservé aux administrateurs');
+        // Si c'est un client, filtrer seulement ses comptes
+        if ($user instanceof \App\Models\Client) {
+            $query = Compte::where('client_id', $user->id)
+                          ->whereIn('type_compte', ['cheque', 'epargne'])
+                          ->where('etat_compte', 'actif');
+        } else {
+            // Pour les admins, vérifier le rôle
+            if ($user->role !== 'admin') {
+                return $this->forbidden('Accès réservé aux administrateurs');
+            }
+            // Construction de la requête optimisée pour les admins
+            $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
         }
 
         // Récupération des query parameters avec valeurs par défaut
@@ -303,90 +312,101 @@ class AdminController extends Controller
         $sort = $request->query('sort', 'dateCreation');
         $order = in_array(strtolower($request->query('order', 'asc')), ['asc', 'desc']) ? strtolower($request->query('order', 'asc')) : 'asc';
 
-        // Construction de la requête optimisée
-        $query = Compte::with(['client:id,nom_complet,email,telephone']); // Charger seulement les champs nécessaires
+        // Pour les admins seulement, appliquer les filtres
+        if ($user instanceof Admin) {
+            // Filtrage par type
+            if ($type && in_array($type, ['cheque', 'epargne'])) {
+                $query->where('type_compte', $type);
+            }
 
-        // Filtrage par type
-        if ($type && in_array($type, ['cheque', 'epargne'])) {
-            $query->where('type_compte', $type);
-        }
+            // Filtrage par statut
+            if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
+                $query->where('etat_compte', $statut);
+            }
 
-        // Filtrage par statut
-        if ($statut && in_array($statut, ['actif', 'inactif', 'bloque'])) {
-            $query->where('etat_compte', $statut);
-        }
+            // Recherche optimisée
+            if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
+                $searchTerm = '%' . $search . '%';
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
+                      ->orWhereHas('client', function($q2) use ($searchTerm) {
+                          $q2->where('nom_complet', 'ILIKE', $searchTerm);
+                      });
+                });
+            }
 
-        // Recherche optimisée
-        if (!empty($search) && strlen($search) >= 2) { // Recherche minimum 2 caractères
-            $searchTerm = '%' . $search . '%';
-            $query->where(function($q) use ($searchTerm) {
-                $q->where('numero_compte', 'ILIKE', $searchTerm) // ILIKE pour PostgreSQL
-                  ->orWhereHas('client', function($q2) use ($searchTerm) {
-                      $q2->where('nom_complet', 'ILIKE', $searchTerm);
-                  });
-            });
-        }
-
-        // Tri optimisé
-        switch ($sort) {
-            case 'dateCreation':
-                $query->orderBy('created_at', $order);
-                break;
-            case 'solde':
-                $query->orderBy('solde', $order);
-                break;
-            case 'titulaire':
-                $query->join('clients', 'comptes.client_id', '=', 'clients.id')
-                      ->orderBy('clients.nom_complet', $order)
-                      ->select('comptes.*');
-                break;
-            default:
-                $query->orderBy('created_at', $order);
+            // Tri optimisé
+            switch ($sort) {
+                case 'dateCreation':
+                    $query->orderBy('created_at', $order);
+                    break;
+                case 'solde':
+                    $query->orderBy('solde', $order);
+                    break;
+                case 'titulaire':
+                    $query->join('clients', 'comptes.client_id', '=', 'clients.id')
+                          ->orderBy('clients.nom_complet', $order)
+                          ->select('comptes.*');
+                    break;
+                default:
+                    $query->orderBy('created_at', $order);
+            }
         }
 
         // Pagination
         $comptes = $query->paginate($limit, ['*'], 'page', $page);
 
         // Formatage des données de réponse
-        $data = $comptes->map(function($compte) {
-            return [
+        $data = $comptes->map(function($compte) use ($user) {
+            $baseData = [
                 'id' => $compte->id,
                 'numeroCompte' => $compte->numero_compte,
-                'titulaire' => $compte->client->nom_complet ?? null,
                 'type' => $compte->type_compte,
                 'solde' => (float) ($compte->solde ?? 0),
                 'devise' => 'FCFA',
                 'dateCreation' => $compte->created_at->toISOString(),
                 'statut' => $compte->etat_compte,
                 'motifBlocage' => $compte->motif_blocage,
-                'metadata' => [
+            ];
+
+            // Ajouter les informations du titulaire seulement pour les admins
+            if ($user instanceof Admin) {
+                $baseData['titulaire'] = $compte->client->nom_complet ?? null;
+                $baseData['metadata'] = [
                     'derniereModification' => $compte->updated_at->toISOString(),
                     'version' => 1
-                ]
-            ];
+                ];
+            }
+
+            return $baseData;
         })->toArray();
 
         // Retour avec le trait ApiResponse
-        return response()->json([
-            'success' => true,
-            'message' => 'Liste des comptes récupérée avec succès',
-            'data' => $data,
-            'pagination' => [
-                'currentPage' => $comptes->currentPage(),
-                'totalPages' => $comptes->lastPage(),
-                'totalItems' => $comptes->total(),
-                'itemsPerPage' => $comptes->perPage(),
-                'hasNext' => $comptes->hasMorePages(),
-                'hasPrevious' => $comptes->currentPage() > 1,
-                'links' => [
-                    'self' => $request->fullUrl(),
-                    'next' => $comptes->nextPageUrl(),
-                    'first' => $comptes->url(1),
-                    'last' => $comptes->url($comptes->lastPage())
-                ]
-            ],
-            'timestamp' => now()->toISOString()
-        ], 200);
+        if ($user instanceof Admin) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Liste des comptes récupérée avec succès',
+                'data' => $data,
+                'pagination' => [
+                    'currentPage' => $comptes->currentPage(),
+                    'totalPages' => $comptes->lastPage(),
+                    'totalItems' => $comptes->total(),
+                    'itemsPerPage' => $comptes->perPage(),
+                    'hasNext' => $comptes->hasMorePages(),
+                    'hasPrevious' => $comptes->currentPage() > 1,
+                    'links' => [
+                        'self' => $request->fullUrl(),
+                        'next' => $comptes->nextPageUrl(),
+                        'first' => $comptes->url(1),
+                        'last' => $comptes->url($comptes->lastPage())
+                    ]
+                ],
+                'timestamp' => now()->toISOString()
+            ], 200);
+        } else {
+            // Pour les clients, retourner une réponse simple sans pagination
+            return $this->success($data, 'Comptes récupérés avec succès');
+        }
     }
 
     /**
