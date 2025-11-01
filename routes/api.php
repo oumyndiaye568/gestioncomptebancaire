@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,35 +25,46 @@ use App\Http\Controllers\ClientController;
 //     ->middleware(['throttle'])
 //     ->name('passport.token');
 
-// Routes pour l'admin
+// Routes d'authentification unifiées
 Route::prefix('v1/auth')->group(function () {
-    Route::post('login', [AdminController::class, 'login']);
-    Route::post('refresh', [AdminController::class, 'refresh']);
-    Route::post('logout', [AdminController::class, 'logout'])->middleware('auth:api');
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 });
 
-Route::middleware(['auth:api', 'role:admin', 'logging'])->prefix('oumy/v1/admin')->group(function () {
-     // Test route pour vérifier l'authentification
-     Route::get('test-auth', function() {
-         return response()->json([
-             'success' => true,
-             'message' => 'Authentification réussie',
-             'user' => request()->user(),
-             'timestamp' => now()->toISOString()
-         ]);
-     });
+// Routes centralisées pour les comptes (RESTful)
+Route::middleware(['auth:api', 'logging'])->prefix('v1')->group(function () {
+    // Test route pour vérifier l'authentification
+    Route::get('test-auth', function() {
+        $user = request()->user();
+        $role = $user instanceof \App\Models\Admin ? 'admin' : 'client';
+        return response()->json([
+            'success' => true,
+            'message' => 'Authentification réussie',
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'role' => $role,
+                'nom' => $user instanceof \App\Models\Admin ? $user->nom : $user->nom_complet
+            ],
+            'timestamp' => now()->toISOString()
+        ]);
+    });
 
-     // Route::get('comptes', [AdminController::class, 'getComptes']); // Commentée pour éviter les conflits
-     Route::post('comptes', [AdminController::class, 'createCompte']);
-     Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
-     Route::get('comptes/{id}', [AdminController::class, 'getCompteDetails']);
-     Route::put('comptes/{id}', [AdminController::class, 'updateCompte']);
-     Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
-     Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
-     Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
-     Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
-     Route::delete('comptes/{id}', [AdminController::class, 'deleteCompte']);
- });
+    // Routes RESTful pour les comptes
+    Route::apiResource('comptes', AdminController::class, [
+        'parameters' => ['comptes' => 'id']
+    ]);
+
+    // Routes supplémentaires pour les comptes
+    Route::middleware('role:admin')->group(function () {
+        Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
+        Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
+        Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
+        Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
+        Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
+    });
+});
 
 // Route de test
 Route::get('test', function() {
@@ -63,13 +75,3 @@ Route::get('test', function() {
         'environment' => app()->environment()
     ]);
 });
-
-// Routes pour le client
-Route::post('client/login', [ClientController::class, 'login']);
-
-Route::middleware('auth:api')->prefix('client')->group(function () {
-    Route::get('comptes', [ClientController::class, 'getComptes']);
-});
-
-// Route générale pour les comptes (avec authentification)
-Route::middleware('auth:api')->get('v1/comptes', [AdminController::class, 'getComptes'])->withoutMiddleware(['role:admin']);

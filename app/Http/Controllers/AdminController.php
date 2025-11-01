@@ -14,7 +14,7 @@ use App\Http\Requests\UpdateCompteRequest;
  * @OA\Info(
  *     title="API Gestion de Comptes Bancaires",
  *     version="1.0.0",
- *     description="API pour la gestion des comptes bancaires avec authentification OAuth2"
+ *     description="API unifiée pour la gestion des comptes bancaires avec authentification OAuth2 pour admins et clients"
  * )
  *
  
@@ -23,24 +23,29 @@ use App\Http\Requests\UpdateCompteRequest;
  *     url="https://gestioncomptebancaire.onrender.com/",
  *     description="Serveur de production"
  * )
+
+ * @OA\Server(
+ *     url="http://127.0.0.1:8000/",
+ *     description="Serveur de développement"
+ * )
  *
  * @OA\SecurityScheme(
  *     securityScheme="bearerAuth",
  *     type="http",
  *     scheme="bearer",
  *     bearerFormat="JWT",
- *     description="Authentification Bearer Token OAuth2 pour les administrateurs"
+ *     description="Authentification Bearer Token OAuth2 pour les administrateurs et clients"
  * )
  *
  *
  * @OA\Tag(
  *     name="Authentification",
- *     description="Endpoints d'authentification OAuth2"
+ *     description="Endpoints d'authentification unifiée pour admins et clients"
  * )
  *
  * @OA\Tag(
  *     name="Comptes",
- *     description="Gestion des comptes bancaires"
+ *     description="Gestion des comptes bancaires avec contrôle d'accès par rôle"
  * )
  */
 
@@ -52,16 +57,16 @@ class AdminController extends Controller
      *
      * @OA\Post(
      *     path="/api/v1/auth/login",
-     *     summary="Connexion administrateur",
-     *     description="Authentifie un administrateur et retourne un token d'accès avec claims personnalisés",
-     *     operationId="adminLogin",
+     *     summary="Connexion unifiée administrateur/client",
+     *     description="Authentifie un administrateur ou un client et retourne un token d'accès",
+     *     operationId="unifiedLogin",
      *     tags={"Authentification"},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"email","password"},
      *             @OA\Property(property="email", type="string", format="email", example="admin@test.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password")
+     *             @OA\Property(property="password", type="string", format="password", example="password123")
      *         )
      *     ),
      * @OA\Response(
@@ -74,11 +79,11 @@ class AdminController extends Controller
      *                 @OA\Property(property="token_type", type="string", example="Bearer"),
      *                 @OA\Property(property="expires_in", type="integer", example=31536000),
      *                 @OA\Property(property="refresh_token", type="string", example="def50200..."),
-     *                 @OA\Property(property="admin", type="object",
+     *                 @OA\Property(property="user", type="object",
      *                     @OA\Property(property="id", type="string", example="uuid"),
      *                     @OA\Property(property="nom", type="string", example="Admin Test"),
      *                     @OA\Property(property="email", type="string", example="admin@test.com"),
-     *                     @OA\Property(property="role", type="string", example="admin")
+     *                     @OA\Property(property="role", type="string", enum={"admin", "client"}, example="admin")
      *                 )
      *             ),
      *             @OA\Property(property="message", type="string", example="Connexion réussie")
@@ -93,11 +98,11 @@ class AdminController extends Controller
      *                 @OA\Property(property="access_token", type="string", example="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."),
      *                 @OA\Property(property="token_type", type="string", example="Bearer"),
      *                 @OA\Property(property="expires_in", type="integer", example=31536000),
-     *                 @OA\Property(property="admin", type="object",
+     *                 @OA\Property(property="user", type="object",
      *                     @OA\Property(property="id", type="string", example="uuid"),
      *                     @OA\Property(property="nom", type="string", example="Admin Test"),
      *                     @OA\Property(property="email", type="string", example="admin@test.com"),
-     *                     @OA\Property(property="role", type="string", example="admin")
+     *                     @OA\Property(property="role", type="string", enum={"admin", "client"}, example="admin")
      *                 )
      *             ),
      *             @OA\Property(property="message", type="string", example="Connexion réussie")
@@ -166,116 +171,116 @@ class AdminController extends Controller
      * Récupérer la liste des comptes avec filtrage, pagination, tri et recherche.
      *
      * @OA\Get(
-          *     path="/api/admin/comptes",
-          *     summary="Lister les comptes bancaires",
-          *     description="Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche",
-          *     operationId="getComptes",
-          *     tags={"Comptes"},
-          *     security={{"passport":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Numéro de la page",
-     *         required=false,
-     *         @OA\Schema(type="integer", default=1, minimum=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="limit",
-     *         in="query",
-     *         description="Nombre d'éléments par page",
-     *         required=false,
-     *         @OA\Schema(type="integer", default=10, minimum=1, maximum=100)
-     *     ),
-     *     @OA\Parameter(
-     *         name="type",
-     *         in="query",
-     *         description="Type de compte (cheque/epargne)",
-     *         required=false,
-     *         @OA\Schema(type="string", enum={"cheque", "epargne"})
-     *     ),
-     *     @OA\Parameter(
-     *         name="statut",
-     *         in="query",
-     *         description="Statut du compte (actif/inactif/bloque)",
-     *         required=false,
-     *         @OA\Schema(type="string", enum={"actif", "inactif", "bloque"})
-     *     ),
-     *     @OA\Parameter(
-     *         name="search",
-     *         in="query",
-     *         description="Recherche par numéro de compte ou nom du titulaire",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Parameter(
-     *         name="sort",
-     *         in="query",
-     *         description="Champ de tri",
-     *         required=false,
-     *         @OA\Schema(type="string", enum={"dateCreation", "solde", "titulaire"}, default="dateCreation")
-     *     ),
-     *     @OA\Parameter(
-     *         name="order",
-     *         in="query",
-     *         description="Ordre de tri",
-     *         required=false,
-     *         @OA\Schema(type="string", enum={"asc", "desc"}, default="asc")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Liste des comptes récupérée avec succès",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="string", example="uuid"),
-     *                     @OA\Property(property="numeroCompte", type="string", example="COMP-20251025-EZ6TJPOP"),
-     *                     @OA\Property(property="titulaire", type="string", example="Prof. Nicola Hessel"),
-     *                     @OA\Property(property="type", type="string", enum={"cheque", "epargne"}, example="epargne"),
-     *                     @OA\Property(property="solde", type="number", format="float", example="452420.00"),
-     *                     @OA\Property(property="devise", type="string", example="FCFA"),
-     *                     @OA\Property(property="dateCreation", type="string", format="date-time", example="2025-10-25T19:21:35+00:00"),
-     *                     @OA\Property(property="statut", type="string", enum={"actif", "inactif", "bloque"}, example="actif"),
-     *                     @OA\Property(property="motifBlocage", type="string", nullable=true, example=null),
-     *                     @OA\Property(property="metadata", type="object",
-     *                         @OA\Property(property="derniereModification", type="string", format="date-time"),
-     *                         @OA\Property(property="version", type="integer", example=1)
-     *                     )
-     *                 )
-     *             ),
-     *             @OA\Property(property="pagination", type="object",
-     *                 @OA\Property(property="currentPage", type="integer", example=1),
-     *                 @OA\Property(property="totalPages", type="integer", example=1),
-     *                 @OA\Property(property="totalItems", type="integer", example=10),
-     *                 @OA\Property(property="itemsPerPage", type="integer", example=10),
-     *                 @OA\Property(property="hasNext", type="boolean", example=false),
-     *                 @OA\Property(property="hasPrevious", type="boolean", example=false)
-     *             ),
-     *             @OA\Property(property="links", type="object",
-     *                 @OA\Property(property="self", type="string", example="http://127.0.0.1:8000/api/admin/comptes"),
-     *                 @OA\Property(property="next", type="string", nullable=true, example=null),
-     *                 @OA\Property(property="first", type="string", example="http://127.0.0.1:8000/api/admin/comptes?page=1"),
-     *                 @OA\Property(property="last", type="string", example="http://127.0.0.1:8000/api/admin/comptes?page=1")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Non authentifié",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="error", type="string", example="Unauthorized")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=403,
-     *         description="Accès refusé",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="error", type="string", example="Unauthorized")
-     *         )
-     *     )
-     * )
-     */
-    public function getComptes(Request $request)
+                *     path="/api/v1/comptes",
+                *     summary="Lister les comptes bancaires",
+                *     description="Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche selon le rôle de l'utilisateur",
+                *     operationId="index",
+                *     tags={"Comptes"},
+                *     security={{"bearerAuth":{}}},
+      *     @OA\Parameter(
+      *         name="page",
+      *         in="query",
+      *         description="Numéro de la page",
+      *         required=false,
+      *         @OA\Schema(type="integer", default=1, minimum=1)
+      *     ),
+      *     @OA\Parameter(
+      *         name="limit",
+      *         in="query",
+      *         description="Nombre d'éléments par page",
+      *         required=false,
+      *         @OA\Schema(type="integer", default=10, minimum=1, maximum=100)
+      *     ),
+      *     @OA\Parameter(
+      *         name="type",
+      *         in="query",
+      *         description="Type de compte (cheque/epargne)",
+      *         required=false,
+      *         @OA\Schema(type="string", enum={"cheque", "epargne"})
+      *     ),
+      *     @OA\Parameter(
+      *         name="statut",
+      *         in="query",
+      *         description="Statut du compte (actif/inactif/bloque)",
+      *         required=false,
+      *         @OA\Schema(type="string", enum={"actif", "inactif", "bloque"})
+      *     ),
+      *     @OA\Parameter(
+      *         name="search",
+      *         in="query",
+      *         description="Recherche par numéro de compte ou nom du titulaire",
+      *         required=false,
+      *         @OA\Schema(type="string")
+      *     ),
+      *     @OA\Parameter(
+      *         name="sort",
+      *         in="query",
+      *         description="Champ de tri",
+      *         required=false,
+      *         @OA\Schema(type="string", enum={"dateCreation", "solde", "titulaire"}, default="dateCreation")
+      *     ),
+      *     @OA\Parameter(
+      *         name="order",
+      *         in="query",
+      *         description="Ordre de tri",
+      *         required=false,
+      *         @OA\Schema(type="string", enum={"asc", "desc"}, default="asc")
+      *     ),
+      *     @OA\Response(
+      *         response=200,
+      *         description="Liste des comptes récupérée avec succès",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="success", type="boolean", example=true),
+      *             @OA\Property(property="data", type="array",
+      *                 @OA\Items(
+      *                     @OA\Property(property="id", type="string", example="uuid"),
+      *                     @OA\Property(property="numeroCompte", type="string", example="COMP-20251025-EZ6TJPOP"),
+      *                     @OA\Property(property="titulaire", type="string", example="Prof. Nicola Hessel"),
+      *                     @OA\Property(property="type", type="string", enum={"cheque", "epargne"}, example="epargne"),
+      *                     @OA\Property(property="solde", type="number", format="float", example="452420.00"),
+      *                     @OA\Property(property="devise", type="string", example="FCFA"),
+      *                     @OA\Property(property="dateCreation", type="string", format="date-time", example="2025-10-25T19:21:35+00:00"),
+      *                     @OA\Property(property="statut", type="string", enum={"actif", "inactif", "bloque"}, example="actif"),
+      *                     @OA\Property(property="motifBlocage", type="string", nullable=true, example=null),
+      *                     @OA\Property(property="metadata", type="object",
+      *                         @OA\Property(property="derniereModification", type="string", format="date-time"),
+      *                         @OA\Property(property="version", type="integer", example=1)
+      *                     )
+      *                 )
+      *             ),
+      *             @OA\Property(property="pagination", type="object",
+      *                 @OA\Property(property="currentPage", type="integer", example=1),
+      *                 @OA\Property(property="totalPages", type="integer", example=1),
+      *                 @OA\Property(property="totalItems", type="integer", example=10),
+      *                 @OA\Property(property="itemsPerPage", type="integer", example=10),
+      *                 @OA\Property(property="hasNext", type="boolean", example=false),
+      *                 @OA\Property(property="hasPrevious", type="boolean", example=false)
+      *             ),
+      *                 @OA\Property(property="links", type="object",
+      *                 @OA\Property(property="self", type="string", example="http://127.0.0.1:8000/api/v1/comptes"),
+      *                 @OA\Property(property="next", type="string", nullable=true, example=null),
+      *                 @OA\Property(property="first", type="string", example="http://127.0.0.1:8000/api/v1/comptes?page=1"),
+      *                 @OA\Property(property="last", type="string", example="http://127.0.0.1:8000/api/v1/comptes?page=1")
+      *             )
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=401,
+      *         description="Non authentifié",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="error", type="string", example="Unauthorized")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=403,
+      *         description="Accès refusé",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="error", type="string", example="Unauthorized")
+      *         )
+      *     )
+      * )
+      */
+    public function index(Request $request)
     {
         // Pour les tests, on utilise l'admin du middleware
         $user = $request->user();
@@ -413,12 +418,12 @@ class AdminController extends Controller
      * Récupérer les détails d'un compte spécifique
      *
      * @OA\Get(
-     *     path="/api/admin/comptes/{id}",
-     *     summary="Détails d'un compte bancaire",
-     *     description="Récupère les informations détaillées d'un compte bancaire spécifique",
-     *     operationId="getCompteDetails",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/{id}",
+          *     summary="Détails d'un compte bancaire",
+          *     description="Récupère les informations détaillées d'un compte bancaire spécifique",
+          *     operationId="getCompteDetails",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -526,12 +531,12 @@ class AdminController extends Controller
      * Mettre à jour un compte bancaire
      *
      * @OA\Put(
-     *     path="/api/admin/comptes/{id}",
-     *     summary="Mettre à jour un compte bancaire",
-     *     description="Permet de modifier les informations d'un compte bancaire existant",
-     *     operationId="updateCompte",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/{id}",
+          *     summary="Mettre à jour un compte bancaire",
+          *     description="Permet de modifier les informations d'un compte bancaire existant",
+          *     operationId="updateCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -647,12 +652,12 @@ class AdminController extends Controller
      * Supprimer logiquement un compte bancaire
      *
      * @OA\Delete(
-     *     path="/api/admin/comptes/{id}",
-     *     summary="Supprimer logiquement un compte bancaire",
-     *     description="Effectue une suppression logique (soft delete) du compte pour conserver l'historique",
-     *     operationId="deleteCompte",
-     *     tags={"Comptes"},
-     *     security={{"bearerAuth":{}}},
+          *     path="/api/v1/comptes/{id}",
+          *     summary="Supprimer logiquement un compte bancaire",
+          *     description="Effectue une suppression logique (soft delete) du compte pour conserver l'historique",
+          *     operationId="deleteCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -747,12 +752,12 @@ class AdminController extends Controller
      * Archiver un compte bancaire
      *
      * @OA\Patch(
-     *     path="/api/admin/comptes/{id}/archive",
-     *     summary="Archiver un compte bancaire",
-     *     description="Marque un compte comme archivé pour le masquer temporairement sans le supprimer",
-     *     operationId="archiveCompte",
-     *     tags={"Comptes"},
-     *     security={{"bearerAuth":{}}},
+          *     path="/api/v1/comptes/{id}/archive",
+          *     summary="Archiver un compte bancaire",
+          *     description="Marque un compte comme archivé pour le masquer temporairement sans le supprimer",
+          *     operationId="archiveCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -852,12 +857,12 @@ class AdminController extends Controller
      * Désarchiver un compte bancaire
      *
      * @OA\Patch(
-     *     path="/api/admin/comptes/{id}/unarchive",
-     *     summary="Désarchiver un compte bancaire",
-     *     description="Remet un compte archivé en service normal",
-     *     operationId="unarchiveCompte",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/{id}/unarchive",
+          *     summary="Désarchiver un compte bancaire",
+          *     description="Remet un compte archivé en service normal",
+          *     operationId="unarchiveCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -957,12 +962,12 @@ class AdminController extends Controller
      * Lister les comptes archivés
      *
      * @OA\Get(
-     *     path="/api/admin/comptes/archived",
-     *     summary="Lister les comptes archivés",
-     *     description="Récupère la liste des comptes archivés avec pagination",
-     *     operationId="getComptesArchived",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/archived",
+          *     summary="Lister les comptes archivés",
+          *     description="Récupère la liste des comptes archivés avec pagination",
+          *     operationId="getComptesArchived",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
@@ -1079,12 +1084,12 @@ class AdminController extends Controller
      * Créer un nouveau compte bancaire
      *
      * @OA\Post(
-     *     path="/api/admin/comptes",
-     *     summary="Créer un nouveau compte bancaire",
-     *     description="Permet de créer un nouveau compte bancaire pour un client existant",
-     *     operationId="createCompte",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes",
+          *     summary="Créer un nouveau compte bancaire",
+          *     description="Permet de créer un nouveau compte bancaire pour un client existant",
+          *     operationId="createCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -1185,12 +1190,12 @@ class AdminController extends Controller
      * Bloquer un compte épargne
      *
      * @OA\Patch(
-     *     path="/api/admin/comptes/{id}/block",
-     *     summary="Bloquer un compte épargne",
-     *     description="Bloque un compte épargne pour empêcher toutes les opérations dessus",
-     *     operationId="blockCompte",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/{id}/block",
+          *     summary="Bloquer un compte épargne",
+          *     description="Bloque un compte épargne pour empêcher toutes les opérations dessus",
+          *     operationId="blockCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1311,12 +1316,12 @@ class AdminController extends Controller
      * Débloquer un compte épargne
      *
      * @OA\Patch(
-     *     path="/api/admin/comptes/{id}/unblock",
-     *     summary="Débloquer un compte épargne",
-     *     description="Débloque un compte épargne bloqué pour permettre à nouveau les opérations",
-     *     operationId="unblockCompte",
-     *     tags={"Comptes"},
-     *     security={{"passport":{}}},
+          *     path="/api/v1/comptes/{id}/unblock",
+          *     summary="Débloquer un compte épargne",
+          *     description="Débloque un compte épargne bloqué pour permettre à nouveau les opérations",
+          *     operationId="unblockCompte",
+          *     tags={"Comptes"},
+          *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",

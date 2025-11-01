@@ -2,13 +2,17 @@
     "openapi": "3.0.0",
     "info": {
         "title": "API Gestion de Comptes Bancaires",
-        "description": "API pour la gestion des comptes bancaires avec authentification OAuth2",
+        "description": "API unifiée pour la gestion des comptes bancaires avec authentification OAuth2 pour admins et clients",
         "version": "1.0.0"
     },
     "servers": [
         {
             "url": "https://gestioncomptebancaire.onrender.com/",
             "description": "Serveur de production"
+        },
+        {
+            "url": "http://127.0.0.1:8000/",
+            "description": "Serveur de développement"
         }
     ],
     "paths": {
@@ -17,9 +21,9 @@
                 "tags": [
                     "Authentification"
                 ],
-                "summary": "Connexion administrateur",
-                "description": "Authentifie un administrateur et retourne un token d'accès avec claims personnalisés",
-                "operationId": "adminLogin",
+                "summary": "Connexion unifiée administrateur/client",
+                "description": "Authentifie un administrateur ou un client et retourne un token d'accès",
+                "operationId": "unifiedLogin",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -38,7 +42,7 @@
                                     "password": {
                                         "type": "string",
                                         "format": "password",
-                                        "example": "password"
+                                        "example": "password123"
                                     }
                                 },
                                 "type": "object"
@@ -75,7 +79,7 @@
                                                     "type": "string",
                                                     "example": "def50200..."
                                                 },
-                                                "admin": {
+                                                "user": {
                                                     "properties": {
                                                         "id": {
                                                             "type": "string",
@@ -91,6 +95,10 @@
                                                         },
                                                         "role": {
                                                             "type": "string",
+                                                            "enum": [
+                                                                "admin",
+                                                                "client"
+                                                            ],
                                                             "example": "admin"
                                                         }
                                                     },
@@ -133,7 +141,7 @@
                                                     "type": "integer",
                                                     "example": 31536000
                                                 },
-                                                "admin": {
+                                                "user": {
                                                     "properties": {
                                                         "id": {
                                                             "type": "string",
@@ -149,6 +157,10 @@
                                                         },
                                                         "role": {
                                                             "type": "string",
+                                                            "enum": [
+                                                                "admin",
+                                                                "client"
+                                                            ],
                                                             "example": "admin"
                                                         }
                                                     },
@@ -212,14 +224,14 @@
                 }
             }
         },
-        "/api/admin/comptes": {
+        "/api/v1/comptes": {
             "get": {
                 "tags": [
                     "Comptes"
                 ],
                 "summary": "Lister les comptes bancaires",
-                "description": "Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche",
-                "operationId": "getComptes",
+                "description": "Récupère la liste paginée des comptes avec possibilité de filtrage, tri et recherche selon le rôle de l'utilisateur",
+                "operationId": "index",
                 "parameters": [
                     {
                         "name": "page",
@@ -423,7 +435,7 @@
                                             "properties": {
                                                 "self": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8000/api/admin/comptes"
+                                                    "example": "http://127.0.0.1:8000/api/v1/comptes"
                                                 },
                                                 "next": {
                                                     "type": "string",
@@ -432,11 +444,11 @@
                                                 },
                                                 "first": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8000/api/admin/comptes?page=1"
+                                                    "example": "http://127.0.0.1:8000/api/v1/comptes?page=1"
                                                 },
                                                 "last": {
                                                     "type": "string",
-                                                    "example": "http://127.0.0.1:8000/api/admin/comptes?page=1"
+                                                    "example": "http://127.0.0.1:8000/api/v1/comptes?page=1"
                                                 }
                                             },
                                             "type": "object"
@@ -482,7 +494,7 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             },
@@ -656,12 +668,12 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             }
         },
-        "/api/admin/comptes/{id}": {
+        "/api/v1/comptes/{id}": {
             "get": {
                 "tags": [
                     "Comptes"
@@ -842,7 +854,7 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             },
@@ -1046,7 +1058,7 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             },
@@ -1191,7 +1203,7 @@
                 ]
             }
         },
-        "/api/admin/comptes/{id}/archive": {
+        "/api/v1/comptes/{id}/archive": {
             "patch": {
                 "tags": [
                     "Comptes"
@@ -1333,7 +1345,7 @@
                 ]
             }
         },
-        "/api/admin/comptes/{id}/unarchive": {
+        "/api/v1/comptes/{id}/unarchive": {
             "patch": {
                 "tags": [
                     "Comptes"
@@ -1470,12 +1482,12 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             }
         },
-        "/api/admin/comptes/archived": {
+        "/api/v1/comptes/archived": {
             "get": {
                 "tags": [
                     "Comptes"
@@ -1639,12 +1651,12 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             }
         },
-        "/api/admin/comptes/{id}/block": {
+        "/api/v1/comptes/{id}/block": {
             "patch": {
                 "tags": [
                     "Comptes"
@@ -1802,12 +1814,12 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             }
         },
-        "/api/admin/comptes/{id}/unblock": {
+        "/api/v1/comptes/{id}/unblock": {
             "patch": {
                 "tags": [
                     "Comptes"
@@ -1949,7 +1961,7 @@
                 },
                 "security": [
                     {
-                        "passport": []
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -2453,11 +2465,11 @@
     "tags": [
         {
             "name": "Authentification",
-            "description": "Endpoints d'authentification OAuth2"
+            "description": "Endpoints d'authentification unifiée pour admins et clients"
         },
         {
             "name": "Comptes",
-            "description": "Gestion des comptes bancaires"
+            "description": "Gestion des comptes bancaires avec contrôle d'accès par rôle"
         },
         {
             "name": "Authentification Client",
