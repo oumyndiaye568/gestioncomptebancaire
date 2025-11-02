@@ -503,27 +503,23 @@
                     "Comptes"
                 ],
                 "summary": "Créer un nouveau compte bancaire",
-                "description": "Permet de créer un nouveau compte bancaire pour un client existant",
+                "description": "Permet de créer un nouveau compte bancaire pour un client existant ou nouveau. L'admin doit être authentifié avec un token Bearer.",
                 "operationId": "createCompte",
                 "requestBody": {
+                    "description": "Données du compte à créer",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "client_id",
-                                    "type_compte",
-                                    "solde"
+                                    "type",
+                                    "soldeInitial",
+                                    "devise",
+                                    "client"
                                 ],
                                 "properties": {
-                                    "client_id": {
-                                        "description": "ID du client propriétaire du compte",
-                                        "type": "string",
-                                        "format": "uuid",
-                                        "example": "uuid"
-                                    },
-                                    "type_compte": {
-                                        "description": "Type de compte",
+                                    "type": {
+                                        "description": "Type de compte bancaire (cheque ou epargne)",
                                         "type": "string",
                                         "enum": [
                                             "cheque",
@@ -531,11 +527,65 @@
                                         ],
                                         "example": "cheque"
                                     },
-                                    "solde": {
-                                        "description": "Solde initial du compte",
+                                    "soldeInitial": {
+                                        "description": "Solde initial du compte (minimum 10 000 FCFA obligatoire)",
                                         "type": "number",
                                         "format": "float",
-                                        "example": "50000.00"
+                                        "minimum": 10000,
+                                        "example": 50000
+                                    },
+                                    "devise": {
+                                        "description": "Devise du compte (uniquement FCFA accepté)",
+                                        "type": "string",
+                                        "enum": [
+                                            "FCFA"
+                                        ],
+                                        "example": "FCFA"
+                                    },
+                                    "client": {
+                                        "description": "Informations du client titulaire du compte",
+                                        "properties": {
+                                            "id": {
+                                                "description": "ID du client existant (optionnel). Si fourni, les autres champs client sont ignorés.",
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "example": null,
+                                                "nullable": true
+                                            },
+                                            "titulaire": {
+                                                "description": "Nom complet du titulaire (obligatoire si client.id est null)",
+                                                "type": "string",
+                                                "maxLength": 255,
+                                                "minLength": 2,
+                                                "example": "Aminata Diop"
+                                            },
+                                            "nci": {
+                                                "description": "Numéro de carte d'identité sénégalais (13 chiffres, obligatoire si client.id est null)",
+                                                "type": "string",
+                                                "pattern": "/^\\d{13}$/",
+                                                "example": "9001011234567"
+                                            },
+                                            "email": {
+                                                "description": "Adresse email unique (obligatoire si client.id est null)",
+                                                "type": "string",
+                                                "format": "email",
+                                                "example": "mamadou.diallo@example.com"
+                                            },
+                                            "telephone": {
+                                                "description": "Numéro de téléphone sénégalais (+221XXXXXXXXX, obligatoire si client.id est null)",
+                                                "type": "string",
+                                                "pattern": "/^\\+221\\d{9}$/",
+                                                "example": "+221771234567"
+                                            },
+                                            "adresse": {
+                                                "description": "Adresse complète du client (obligatoire si client.id est null)",
+                                                "type": "string",
+                                                "maxLength": 500,
+                                                "minLength": 5,
+                                                "example": "Dakar, Sénégal"
+                                            }
+                                        },
+                                        "type": "object"
                                     }
                                 },
                                 "type": "object"
@@ -545,7 +595,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Compte créé avec succès",
+                        "description": "Compte créé avec succès. Un email avec le mot de passe temporaire et un SMS avec le code de validation ont été envoyés au client.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -558,11 +608,17 @@
                                             "properties": {
                                                 "id": {
                                                     "type": "string",
-                                                    "example": "uuid"
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
                                                 },
                                                 "numeroCompte": {
+                                                    "description": "Numéro unique du compte généré automatiquement",
                                                     "type": "string",
-                                                    "example": "COMP-20251028-ABC123"
+                                                    "example": "C20251102UBYMSI"
+                                                },
+                                                "titulaire": {
+                                                    "type": "string",
+                                                    "example": "Aminata Diop"
                                                 },
                                                 "type": {
                                                     "type": "string",
@@ -573,34 +629,28 @@
                                                     "example": "cheque"
                                                 },
                                                 "solde": {
+                                                    "description": "Solde actuel calculé dynamiquement",
                                                     "type": "number",
                                                     "format": "float",
-                                                    "example": "50000.00"
+                                                    "example": 50000
                                                 },
-                                                "statut": {
+                                                "devise": {
                                                     "type": "string",
-                                                    "example": "actif"
-                                                },
-                                                "client": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "string",
-                                                            "example": "uuid"
-                                                        },
-                                                        "nomComplet": {
-                                                            "type": "string",
-                                                            "example": "John Doe"
-                                                        },
-                                                        "email": {
-                                                            "type": "string",
-                                                            "example": "john@example.com"
-                                                        }
-                                                    },
-                                                    "type": "object"
+                                                    "example": "FCFA"
                                                 },
                                                 "dateCreation": {
                                                     "type": "string",
-                                                    "format": "date-time"
+                                                    "format": "date-time",
+                                                    "example": "2025-11-02T16:17:43+00:00"
+                                                },
+                                                "statut": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "actif",
+                                                        "inactif",
+                                                        "bloque"
+                                                    ],
+                                                    "example": "actif"
                                                 }
                                             },
                                             "type": "object"
@@ -615,14 +665,101 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Erreur de validation",
+                    "400": {
+                        "description": "Erreur de validation des données fournies",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
                                         "message": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "example": "Erreur de validation"
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "soldeInitial": [
+                                                    "Le solde initial doit être d'au moins 10 000 FCFA."
+                                                ],
+                                                "client.telephone": [
+                                                    "Le numéro de téléphone doit être au format sénégalais (+221XXXXXXXXX)."
+                                                ],
+                                                "client.nci": [
+                                                    "Le numéro de carte d'identité doit contenir exactement 13 chiffres."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token d'authentification manquant ou invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "invalid_token"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé - L'utilisateur n'a pas les droits administrateur",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Accès réservé aux administrateurs"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "insufficient_permissions"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation - Données malformées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Les données fournies sont invalides"
                                         },
                                         "errors": {
                                             "type": "object"
@@ -633,31 +770,23 @@
                             }
                         }
                     },
-                    "401": {
-                        "description": "Non authentifié",
+                    "500": {
+                        "description": "Erreur interne du serveur",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Erreur interne du serveur"
+                                        },
                                         "error": {
                                             "type": "string",
-                                            "example": "Unauthorized"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Accès refusé",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Unauthorized"
+                                            "example": "internal_error"
                                         }
                                     },
                                     "type": "object"

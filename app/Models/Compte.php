@@ -26,26 +26,26 @@ class Compte extends Model
             }
 
             if (empty($compte->numero_compte)) {
-                $compte->numero_compte = 'COMP-' . date('Ymd') . '-' . strtoupper(Str::random(8));
+                $compte->numero_compte = self::generateUniqueAccountNumber();
             }
         });
     }
     protected $primaryKey = 'id';
-    public $incrementing = false; 
-    protected $keyType = 'string'; 
+    public $incrementing = false;
+    protected $keyType = 'string';
 
 
 
      protected $fillable = [
 
-        'numero_compte',
-        'type_compte',
-        'etat_compte',
-        'solde',
-        'motif_blocage',
-        'client_id',
-        'is_archived',
-    ];
+         'numero_compte',
+         'type_compte',
+         'etat_compte',
+         'solde',
+         'motif_blocage',
+         'client_id',
+         'is_archived',
+     ];
 
 
         protected $casts = [
@@ -114,6 +114,38 @@ class Compte extends Model
     public function client()
     {
         return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    /**
+     * Relation : un compte a plusieurs opérations (dépôts/retraits)
+     */
+    public function operations()
+    {
+        return $this->hasMany(Operation::class, 'compte_id');
+    }
+
+    /**
+     * Générer un numéro de compte unique
+     */
+    public static function generateUniqueAccountNumber(): string
+    {
+        do {
+            $numero = 'C' . date('Ymd') . strtoupper(Str::random(6));
+        } while (self::where('numero_compte', $numero)->exists());
+
+        return $numero;
+    }
+
+    /**
+     * Accesseur pour calculer le solde dynamique
+     */
+    public function getSoldeAttribute()
+    {
+        // Solde = Somme des dépôts - Somme des retraits
+        $debits = $this->operations()->where('type_operation', 'debit')->sum('montant');
+        $credits = $this->operations()->where('type_operation', 'credit')->sum('montant');
+
+        return $credits - $debits;
     }
 
     /**

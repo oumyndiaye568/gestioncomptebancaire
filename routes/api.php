@@ -51,18 +51,61 @@ Route::middleware(['auth:api', 'logging'])->prefix('v1')->group(function () {
         ]);
     });
 
-    // Routes RESTful pour les comptes
-    Route::apiResource('comptes', AdminController::class, [
-        'parameters' => ['comptes' => 'id']
-    ]);
+    // Route de test pour Twilio SMS
+    Route::get('test-sms', function() {
+        try {
+            $twilio = new \Twilio\Rest\Client(
+                config('services.twilio.sid'),
+                config('services.twilio.token')
+            );
 
-    // Routes supplémentaires pour les comptes
-    Route::middleware('role:admin')->group(function () {
-        Route::get('comptes/archived', [AdminController::class, 'getComptesArchived']);
-        Route::patch('comptes/{id}/archive', [AdminController::class, 'archiveCompte']);
-        Route::patch('comptes/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
-        Route::patch('comptes/{id}/block', [AdminController::class, 'blockCompte']);
-        Route::patch('comptes/{id}/unblock', [AdminController::class, 'unblockCompte']);
+            $message = $twilio->messages->create(
+                '+221771234567', // Numéro de test - à remplacer
+                [
+                    'from' => config('services.twilio.from'),
+                    'body' => 'Test SMS - API Gestion Comptes fonctionne!'
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'SMS envoyé avec succès',
+                'sid' => $message->sid,
+                'status' => $message->status
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Routes pour les comptes bancaires
+    Route::prefix('comptes')->group(function () {
+        // Création de compte (réservé aux admins)
+        Route::post('/', [AdminController::class, 'store'])->middleware('role:admin');
+
+        // Liste des comptes (accessible aux admins et clients)
+        Route::get('/', [AdminController::class, 'index']);
+
+        // Détail d'un compte
+        Route::get('/{id}', [AdminController::class, 'getCompteDetails']);
+
+        // Mise à jour d'un compte (réservé aux admins)
+        Route::put('/{id}', [AdminController::class, 'updateCompte'])->middleware('role:admin');
+
+        // Suppression logique d'un compte (réservé aux admins)
+        Route::delete('/{id}', [AdminController::class, 'deleteCompte'])->middleware('role:admin');
+
+        // Routes supplémentaires pour les comptes (réservées aux admins)
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/archived', [AdminController::class, 'getComptesArchived']);
+            Route::patch('/{id}/archive', [AdminController::class, 'archiveCompte']);
+            Route::patch('/{id}/unarchive', [AdminController::class, 'unarchiveCompte']);
+            Route::patch('/{id}/block', [AdminController::class, 'blockCompte']);
+            Route::patch('/{id}/unblock', [AdminController::class, 'unblockCompte']);
+        });
     });
 });
 

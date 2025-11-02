@@ -19,7 +19,7 @@ class AdminSeeder extends Seeder
         ], [
             'nom' => 'Admin Test',
             'email' => 'admin@test.com',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('password123'),
         ]);
 
         Admin::firstOrCreate([
