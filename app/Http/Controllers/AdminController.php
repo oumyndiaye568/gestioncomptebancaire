@@ -1317,9 +1317,9 @@ class AdminController extends Controller
         $data = [
             'id' => $compte->id,
             'numeroCompte' => $compte->numero_compte,
-            'titulaire' => $client->nom_complet,
-            'type' => $compte->type_compte->value,
-            'solde' => (float) $compte->solde,
+            'titulaire' => $validatedData['client']['titulaire'],
+            'type' => $validatedData['type'],
+            'solde' => (float) $validatedData['soldeInitial'],
             'devise' => $validatedData['devise'],
             'dateCreation' => $compte->created_at->toISOString(),
             'statut' => $compte->etat_compte->value,
