@@ -34,9 +34,9 @@ class CreateCompteRequest extends FormRequest
             'client' => 'required|array',
             'client.id' => 'nullable|uuid|exists:clients,id',
             'client.titulaire' => 'required_if:client.id,null|string|min:2|max:255',
-            'client.nci' => ['required_if:client.id,null', new NciSenegalais(), 'unique:clients,nci,NULL,id,deleted_at,NULL'],
-            'client.email' => 'required_if:client.id,null|email|unique:clients,email,NULL,id,deleted_at,NULL',
-            'client.telephone' => ['required_if:client.id,null', new TelephoneSenegalais(), 'unique:clients,telephone,NULL,id,deleted_at,NULL'],
+            'client.nci' => ['required_if:client.id,null', new NciSenegalais()],
+            'client.email' => 'required_if:client.id,null|email',
+            'client.telephone' => ['required_if:client.id,null', new TelephoneSenegalais()],
             'client.adresse' => 'required_if:client.id,null|string|min:5|max:500',
         ];
     }

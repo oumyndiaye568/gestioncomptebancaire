@@ -1265,15 +1265,23 @@ class AdminController extends Controller
             $generatedPassword = \App\Models\Client::generateTemporaryPassword();
             $smsCode = \App\Models\Client::generateVerificationCode();
 
-            $client = \App\Models\Client::create([
-                'nom_complet' => $validatedData['client']['titulaire'],
-                'email' => $validatedData['client']['email'],
-                'telephone' => $validatedData['client']['telephone'],
-                'adresse' => $validatedData['client']['adresse'],
-                'nci' => $validatedData['client']['nci'],
-                'password' => \Illuminate\Support\Facades\Hash::make($generatedPassword),
-                'code_verification' => $smsCode,
-            ]);
+            try {
+                $client = \App\Models\Client::create([
+                    'nom_complet' => $validatedData['client']['titulaire'],
+                    'email' => $validatedData['client']['email'],
+                    'telephone' => $validatedData['client']['telephone'],
+                    'adresse' => $validatedData['client']['adresse'],
+                    'nci' => $validatedData['client']['nci'],
+                    'password' => \Illuminate\Support\Facades\Hash::make($generatedPassword),
+                    'code_verification' => $smsCode,
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Gérer les erreurs de base de données (contraintes d'unicité)
+                if ($e->getCode() == 23505) { // Code PostgreSQL pour violation de contrainte unique
+                    return $this->error('Un client avec cet email ou numéro de téléphone existe déjà', 422);
+                }
+                throw $e; // Relancer l'exception si ce n'est pas une violation d'unicité
+            }
         }
 
         // Créer le compte
